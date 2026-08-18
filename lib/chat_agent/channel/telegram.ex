@@ -26,7 +26,11 @@ defmodule ChatAgent.Channel.Telegram do
            "private chat, where it equals the user's own id, negative for a group or channel."},
         {"from.id",
          "Who sent the message. Equal to chat.id in a private chat, but a person inside " <>
-           "the group otherwise. Absent on channel posts."}
+           "the group otherwise. Absent on channel posts."},
+        {"update_id",
+         "The webhook delivery, not the message. Per bot and sequential, which is what " <>
+           "makes it useful for ignoring a repeated delivery, though it restarts from a " <>
+           "random number after a week with no updates."}
       ]
     }
   end
@@ -42,13 +46,14 @@ defmodule ChatAgent.Channel.Telegram do
         } = update
       ) do
     # `from` names the person, `chat` names the conversation. They agree in a
-    # private chat and diverge in a group, so a reply must use the chat.
-    sender = get_in(message, ["from", "id"]) || chat_id
+    # private chat, where the chat id is the user's own id, and diverge in a
+    # group, so a reply must use the chat.
+    from_id = get_in(message, ["from", "id"])
 
     Logger.info(%{
       what: "telegram_message_received",
       chat_id: chat_id,
-      from_id: sender,
+      from_id: from_id,
       text: text,
       update_id: update["update_id"]
     })
@@ -56,9 +61,9 @@ defmodule ChatAgent.Channel.Telegram do
     {:ok,
      Message.new(
        id: to_string(update["update_id"]),
-       sender: to_string(sender),
+       sender: to_string(from_id || chat_id),
        conversation: to_string(chat_id),
-       identifiers: [{"chat.id", to_string(chat_id)}, {"from.id", to_string(sender)}],
+       identifiers: identifiers(update["update_id"], chat_id, from_id),
        text: text
      )}
   end
@@ -123,6 +128,14 @@ defmodule ChatAgent.Channel.Telegram do
   ### ==========================================================================
   ### Private functions
   ### ==========================================================================
+
+  # Report only what the payload carried. A channel post has no `from`, and
+  # printing the chat id under that name would show a value that never arrived.
+  defp identifiers(update_id, chat_id, from_id) do
+    from = if from_id, do: [{"from.id", to_string(from_id)}], else: []
+
+    [{"chat.id", to_string(chat_id)}] ++ from ++ [{"update_id", to_string(update_id)}]
+  end
 
   # The Bot API answers 200 with `"ok" => false` for logical failures, so the
   # body decides the outcome rather than the status alone.

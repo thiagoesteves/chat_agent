@@ -71,14 +71,16 @@ defmodule ChatAgentWeb.ChannelLive do
                   <.channel_icon channel={channel} />
                 </span>
                 <div class="channel-names">
-                  <h2>{channel}</h2>
-                  <div class="channel-fields">
-                    <code :for={{name, _meaning} <- @references[channel].fields}>{name}</code>
+                  <div class="channel-title">
+                    <h2>{channel}</h2>
                     <.channel_reference
                       channel={channel}
                       module={module}
                       reference={@references[channel]}
                     />
+                  </div>
+                  <div class="channel-fields">
+                    <code :for={{name, _meaning} <- @references[channel].fields}>{name}</code>
                   </div>
                 </div>
               </div>

@@ -330,6 +330,15 @@ main:has(.page-wide) {
   min-width: 0;
 }
 
+/* The marker sits with the name rather than after the field chips, so it never
+ * orphans onto a line of its own when the chips wrap.
+ */
+.channel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
 .channel-fields {
   display: flex;
   align-items: center;

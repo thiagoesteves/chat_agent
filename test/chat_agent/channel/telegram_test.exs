@@ -8,10 +8,13 @@ defmodule ChatAgent.Channel.TelegramTest do
 
   describe "handle_message/1" do
     test "processes a text message" do
+      # A private chat, where Telegram reports the same number for both: the
+      # chat id of a one to one conversation is the user's own id.
       update = %{
         "update_id" => 1,
         "message" => %{
           "chat" => %{"id" => 123_456},
+          "from" => %{"id" => 123_456},
           "text" => "Hello"
         }
       }
@@ -20,7 +23,13 @@ defmodule ChatAgent.Channel.TelegramTest do
       assert parsed.id == "1"
       assert parsed.sender == "123456"
       assert parsed.conversation == "123456"
-      assert parsed.identifiers == [{"chat.id", "123456"}, {"from.id", "123456"}]
+
+      assert parsed.identifiers == [
+               {"chat.id", "123456"},
+               {"from.id", "123456"},
+               {"update_id", "1"}
+             ]
+
       assert parsed.text == "Hello"
       assert %DateTime{} = parsed.received_at
     end
@@ -38,7 +47,12 @@ defmodule ChatAgent.Channel.TelegramTest do
       assert {:ok, %Message{} = parsed} = Telegram.handle_message(update)
       assert parsed.sender == "42"
       assert parsed.conversation == "-1001234567890"
-      assert parsed.identifiers == [{"chat.id", "-1001234567890"}, {"from.id", "42"}]
+
+      assert parsed.identifiers == [
+               {"chat.id", "-1001234567890"},
+               {"from.id", "42"},
+               {"update_id", "2"}
+             ]
     end
 
     test "falls back to the chat when the payload names no sender" do
@@ -50,6 +64,10 @@ defmodule ChatAgent.Channel.TelegramTest do
       assert {:ok, %Message{} = parsed} = Telegram.handle_message(update)
       assert parsed.sender == "99"
       assert parsed.conversation == "99"
+
+      # No from.id arrived, so none is reported rather than echoing the chat id
+      # back under a name the payload never used.
+      assert parsed.identifiers == [{"chat.id", "99"}, {"update_id", "3"}]
     end
 
     test "processes an unknown update" do
@@ -134,6 +152,7 @@ defmodule ChatAgent.Channel.TelegramTest do
       assert reference.url =~ "core.telegram.org"
       assert {"chat.id", _} = Enum.find(reference.fields, &match?({"chat.id", _}, &1))
       assert {"from.id", _} = Enum.find(reference.fields, &match?({"from.id", _}, &1))
+      assert {"update_id", _} = Enum.find(reference.fields, &match?({"update_id", _}, &1))
     end
   end
 
