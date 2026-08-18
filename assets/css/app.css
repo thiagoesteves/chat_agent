@@ -605,20 +605,18 @@ main:has(.page-wide) {
 /* Each channel gets the chat colours of the app it speaks to, so a card is
  * recognisable at a glance, incoming and outgoing bubbles included.
  *
- * The wallpapers below are drawn here rather than taken from either service,
- * so this repository carries no artwork that is not ours. To use a service's
- * own wallpaper instead, drop the image into priv/static/images/ and point the
- * channel at it, which is the whole change:
+ * Each channel also carries the wallpaper of the service it speaks to, from
+ * priv/static/images.
  *
- *   .channel-body.is-whatsapp { --chat-pattern: url("/images/whatsapp-bg.png"); }
- *
- * Set it in the dark blocks too if the image needs to differ by theme.
+ * There is one file per channel per theme, named wallpaper-<channel>-<theme>,
+ * so nothing is tinted or inverted to stand in for artwork that is missing.
+ * A new channel sets --chat-image in its own palette block, in both themes.
  */
 .channel-body.is-whatsapp {
   --chat-bg: #efeae2;
   --bubble: #ffffff;
   --bubble-text: #111b21;
-  --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23000' fill-opacity='.055'%3E%3Ccircle cx='44' cy='44' r='2.5'/%3E%3Ccircle cx='112' cy='86' r='2.5'/%3E%3Ccircle cx='40' cy='122' r='2'/%3E%3Ccircle cx='152' cy='104' r='2.5'/%3E%3Ccircle cx='72' cy='150' r='2'/%3E%3C/g%3E%3Cg fill='none' stroke='%23000' stroke-opacity='.06' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='20' cy='24' r='9'/%3E%3Cpath d='M48 18q8 10 16 0'/%3E%3Cpath d='M88 12v16M80 20h16'/%3E%3Cpath d='M124 32l-8-14h16z'/%3E%3Cpath d='M148 20a8 8 0 0 1 8 8'/%3E%3Cpath d='M16 66q9-11 18 0t18 0'/%3E%3Ccircle cx='76' cy='62' r='6'/%3E%3Crect x='100' y='54' width='16' height='14' rx='4'/%3E%3Cpath d='M134 58h14v12h-14z'/%3E%3Cpath d='M134 58l7 6 7-6'/%3E%3Cpath d='M20 104h18M29 95v18'/%3E%3Ccircle cx='64' cy='106' r='8'/%3E%3Cpath d='M96 100q9 9 18 0'/%3E%3Cpath d='M132 96l6 12 6-12'/%3E%3Cpath d='M14 140q10-8 20 0'/%3E%3Crect x='52' y='134' width='14' height='14' rx='7'/%3E%3Cpath d='M88 132v16M96 140h-16'/%3E%3Ccircle cx='124' cy='142' r='6'/%3E%3Cpath d='M148 134l8 8-8 8'/%3E%3C/g%3E%3C/svg%3E");
+  --chat-image: url("/images/wallpaper-whatsapp-light.png");
   --bubble-out: #d9fdd3;
   --bubble-out-text: #111b21;
   --bubble-meta: #667781;
@@ -631,7 +629,7 @@ main:has(.page-wide) {
   --chat-bg: #dfe9f2;
   --bubble: #ffffff;
   --bubble-text: #0f1419;
-  --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23000' fill-opacity='.05'%3E%3Ccircle cx='24' cy='24' r='3'/%3E%3Ccircle cx='72' cy='40' r='2.5'/%3E%3Ccircle cx='120' cy='20' r='3'/%3E%3Ccircle cx='40' cy='84' r='2.5'/%3E%3Ccircle cx='92' cy='104' r='3'/%3E%3Ccircle cx='140' cy='72' r='2.5'/%3E%3Ccircle cx='28' cy='150' r='2.5'/%3E%3Ccircle cx='84' cy='146' r='3'/%3E%3C/g%3E%3Cg fill='none' stroke='%23000' stroke-opacity='.05' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M52 68l12-12M54 118l12-12M100 44l12-12M18 44l12-12M132 96l12-12'/%3E%3Ccircle cx='20' cy='112' r='8'/%3E%3Ccircle cx='118' cy='128' r='6'/%3E%3Ccircle cx='100' cy='70' r='10'/%3E%3Ccircle cx='150' cy='40' r='7'/%3E%3Ccircle cx='62' cy='22' r='5'/%3E%3Ccircle cx='150' cy='150' r='9'/%3E%3C/g%3E%3C/svg%3E");
+  --chat-image: url("/images/wallpaper-telegram-light.jpg");
   --bubble-out: #effdde;
   --bubble-out-text: #0f1419;
   --bubble-meta: #707579;
@@ -644,7 +642,7 @@ main:has(.page-wide) {
   --chat-bg: var(--surface);
   --bubble: var(--surface-sunken);
   --bubble-text: var(--text);
-  --chat-pattern: none;
+  --chat-image: none;
   --bubble-out: var(--surface-sunken);
   --bubble-out-text: var(--text);
   --bubble-meta: var(--text-muted);
@@ -657,8 +655,8 @@ main:has(.page-wide) {
   flex-direction: column;
   min-height: 10rem;
   border-radius: 0 0 0.6875rem 0.6875rem;
+  position: relative;
   background-color: var(--chat-bg);
-  background-image: var(--chat-pattern);
   overflow: hidden;
 }
 
@@ -669,7 +667,7 @@ main:has(.page-wide) {
     --chat-bg: #0b141a;
     --bubble: #202c33;
     --bubble-text: #e9edef;
-    --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23fff' fill-opacity='.05'%3E%3Ccircle cx='44' cy='44' r='2.5'/%3E%3Ccircle cx='112' cy='86' r='2.5'/%3E%3Ccircle cx='40' cy='122' r='2'/%3E%3Ccircle cx='152' cy='104' r='2.5'/%3E%3Ccircle cx='72' cy='150' r='2'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.055' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='20' cy='24' r='9'/%3E%3Cpath d='M48 18q8 10 16 0'/%3E%3Cpath d='M88 12v16M80 20h16'/%3E%3Cpath d='M124 32l-8-14h16z'/%3E%3Cpath d='M148 20a8 8 0 0 1 8 8'/%3E%3Cpath d='M16 66q9-11 18 0t18 0'/%3E%3Ccircle cx='76' cy='62' r='6'/%3E%3Crect x='100' y='54' width='16' height='14' rx='4'/%3E%3Cpath d='M134 58h14v12h-14z'/%3E%3Cpath d='M134 58l7 6 7-6'/%3E%3Cpath d='M20 104h18M29 95v18'/%3E%3Ccircle cx='64' cy='106' r='8'/%3E%3Cpath d='M96 100q9 9 18 0'/%3E%3Cpath d='M132 96l6 12 6-12'/%3E%3Cpath d='M14 140q10-8 20 0'/%3E%3Crect x='52' y='134' width='14' height='14' rx='7'/%3E%3Cpath d='M88 132v16M96 140h-16'/%3E%3Ccircle cx='124' cy='142' r='6'/%3E%3Cpath d='M148 134l8 8-8 8'/%3E%3C/g%3E%3C/svg%3E");
+    --chat-image: url("/images/wallpaper-whatsapp-dark.jpg");
   --bubble-out: #005c4b;
     --bubble-out-text: #e9edef;
     --bubble-meta: #8696a0;
@@ -682,7 +680,7 @@ main:has(.page-wide) {
     --chat-bg: #0e1621;
     --bubble: #182533;
     --bubble-text: #e9edef;
-    --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23fff' fill-opacity='.045'%3E%3Ccircle cx='24' cy='24' r='3'/%3E%3Ccircle cx='72' cy='40' r='2.5'/%3E%3Ccircle cx='120' cy='20' r='3'/%3E%3Ccircle cx='40' cy='84' r='2.5'/%3E%3Ccircle cx='92' cy='104' r='3'/%3E%3Ccircle cx='140' cy='72' r='2.5'/%3E%3Ccircle cx='28' cy='150' r='2.5'/%3E%3Ccircle cx='84' cy='146' r='3'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.05' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M52 68l12-12M54 118l12-12M100 44l12-12M18 44l12-12M132 96l12-12'/%3E%3Ccircle cx='20' cy='112' r='8'/%3E%3Ccircle cx='118' cy='128' r='6'/%3E%3Ccircle cx='100' cy='70' r='10'/%3E%3Ccircle cx='150' cy='40' r='7'/%3E%3Ccircle cx='62' cy='22' r='5'/%3E%3Ccircle cx='150' cy='150' r='9'/%3E%3C/g%3E%3C/svg%3E");
+    --chat-image: url("/images/wallpaper-telegram-dark.jpg");
   --bubble-out: #2b5278;
     --bubble-out-text: #e9edef;
     --bubble-meta: #7d8b99;
@@ -696,7 +694,7 @@ html[data-theme="dark"] .channel-body.is-whatsapp {
   --chat-bg: #0b141a;
   --bubble: #202c33;
   --bubble-text: #e9edef;
-  --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23fff' fill-opacity='.05'%3E%3Ccircle cx='44' cy='44' r='2.5'/%3E%3Ccircle cx='112' cy='86' r='2.5'/%3E%3Ccircle cx='40' cy='122' r='2'/%3E%3Ccircle cx='152' cy='104' r='2.5'/%3E%3Ccircle cx='72' cy='150' r='2'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.055' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='20' cy='24' r='9'/%3E%3Cpath d='M48 18q8 10 16 0'/%3E%3Cpath d='M88 12v16M80 20h16'/%3E%3Cpath d='M124 32l-8-14h16z'/%3E%3Cpath d='M148 20a8 8 0 0 1 8 8'/%3E%3Cpath d='M16 66q9-11 18 0t18 0'/%3E%3Ccircle cx='76' cy='62' r='6'/%3E%3Crect x='100' y='54' width='16' height='14' rx='4'/%3E%3Cpath d='M134 58h14v12h-14z'/%3E%3Cpath d='M134 58l7 6 7-6'/%3E%3Cpath d='M20 104h18M29 95v18'/%3E%3Ccircle cx='64' cy='106' r='8'/%3E%3Cpath d='M96 100q9 9 18 0'/%3E%3Cpath d='M132 96l6 12 6-12'/%3E%3Cpath d='M14 140q10-8 20 0'/%3E%3Crect x='52' y='134' width='14' height='14' rx='7'/%3E%3Cpath d='M88 132v16M96 140h-16'/%3E%3Ccircle cx='124' cy='142' r='6'/%3E%3Cpath d='M148 134l8 8-8 8'/%3E%3C/g%3E%3C/svg%3E");
+  --chat-image: url("/images/wallpaper-whatsapp-dark.jpg");
   --bubble-out: #005c4b;
   --bubble-out-text: #e9edef;
   --bubble-meta: #8696a0;
@@ -709,11 +707,33 @@ html[data-theme="dark"] .channel-body.is-telegram {
   --chat-bg: #0e1621;
   --bubble: #182533;
   --bubble-text: #e9edef;
-  --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23fff' fill-opacity='.045'%3E%3Ccircle cx='24' cy='24' r='3'/%3E%3Ccircle cx='72' cy='40' r='2.5'/%3E%3Ccircle cx='120' cy='20' r='3'/%3E%3Ccircle cx='40' cy='84' r='2.5'/%3E%3Ccircle cx='92' cy='104' r='3'/%3E%3Ccircle cx='140' cy='72' r='2.5'/%3E%3Ccircle cx='28' cy='150' r='2.5'/%3E%3Ccircle cx='84' cy='146' r='3'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.05' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M52 68l12-12M54 118l12-12M100 44l12-12M18 44l12-12M132 96l12-12'/%3E%3Ccircle cx='20' cy='112' r='8'/%3E%3Ccircle cx='118' cy='128' r='6'/%3E%3Ccircle cx='100' cy='70' r='10'/%3E%3Ccircle cx='150' cy='40' r='7'/%3E%3Ccircle cx='62' cy='22' r='5'/%3E%3Ccircle cx='150' cy='150' r='9'/%3E%3C/g%3E%3C/svg%3E");
+  --chat-image: url("/images/wallpaper-telegram-dark.jpg");
   --bubble-out: #2b5278;
   --bubble-out-text: #e9edef;
   --bubble-meta: #7d8b99;
   --bubble-sender: #6ab3f3;
+}
+
+/* The wallpaper is its own layer rather than a background on the pane, so the
+ * chat colour underneath still shows through wherever the artwork does not
+ * reach, and the bubbles keep their own stacking above it.
+ */
+.channel-body::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background-image: var(--chat-image);
+  background-size: 340px auto;
+  background-repeat: repeat;
+  pointer-events: none;
+}
+
+.message-list,
+.channel-empty,
+.message-form {
+  position: relative;
+  z-index: 1;
 }
 
 /* Newest at the bottom, the way a chat client reads.
