@@ -97,7 +97,12 @@ defmodule ChatAgentWeb.ChannelLive do
               <ol :if={@messages[channel] != []} class="message-list">
                 <li :for={message <- @messages[channel]} class="message">
                   <div class="message-bubble">
-                    <span class="message-sender">{message.sender}</span>
+                    <p class="message-ids">
+                      <span :for={{name, value} <- message.identifiers}>
+                        <span class="message-id-name">{name}</span>
+                        <span class="message-id-value" title={value}>{value}</span>
+                      </span>
+                    </p>
                     <p class="message-text">{message.text}</p>
                     <time datetime={DateTime.to_iso8601(message.received_at)}>
                       {Calendar.strftime(message.received_at, "%H:%M")}

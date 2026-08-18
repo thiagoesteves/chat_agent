@@ -9,12 +9,16 @@ defmodule ChatAgent.Channel.Message do
   They are the same value on a service that only carries one to one chats, and
   different on one that carries groups, where the conversation is the group and
   the sender is a person in it.
+
+  `:identifiers` are the raw values the service gave, under the names it uses
+  for them. They are what the dashboard shows, and the names line up with the
+  ones `c:ChatAgent.Channel.Adapter.reference/0` documents.
   `ChatAgent.Channel` stamps the `:channel` field when it broadcasts, so a
   channel module never has to know which key it was registered under.
   """
 
   @enforce_keys [:sender, :conversation, :text, :received_at]
-  defstruct [:channel, :id, :sender, :conversation, :text, :received_at]
+  defstruct [:channel, :id, :sender, :conversation, :text, :received_at, identifiers: []]
 
   @type t :: %__MODULE__{
           channel: atom() | nil,
@@ -22,7 +26,8 @@ defmodule ChatAgent.Channel.Message do
           sender: String.t(),
           conversation: String.t(),
           text: String.t(),
-          received_at: DateTime.t()
+          received_at: DateTime.t(),
+          identifiers: [{name :: String.t(), value :: String.t()}]
         }
 
   @doc """

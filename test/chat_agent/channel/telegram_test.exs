@@ -20,6 +20,7 @@ defmodule ChatAgent.Channel.TelegramTest do
       assert parsed.id == "1"
       assert parsed.sender == "123456"
       assert parsed.conversation == "123456"
+      assert parsed.identifiers == [{"chat.id", "123456"}, {"from.id", "123456"}]
       assert parsed.text == "Hello"
       assert %DateTime{} = parsed.received_at
     end
@@ -37,6 +38,7 @@ defmodule ChatAgent.Channel.TelegramTest do
       assert {:ok, %Message{} = parsed} = Telegram.handle_message(update)
       assert parsed.sender == "42"
       assert parsed.conversation == "-1001234567890"
+      assert parsed.identifiers == [{"chat.id", "-1001234567890"}, {"from.id", "42"}]
     end
 
     test "falls back to the chat when the payload names no sender" do

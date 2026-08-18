@@ -567,11 +567,32 @@ html[data-theme="dark"] .channel-body.is-telegram {
   box-shadow: 0 1px 0.5px rgb(0 0 0 / 0.13);
 }
 
-.message-sender {
-  display: block;
-  font-size: 0.75rem;
+.message-ids {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.125rem 0.625rem;
+  margin: 0 0 0.125rem;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+
+.message-ids > span {
+  display: inline-flex;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.message-id-name {
+  color: var(--bubble-meta);
+}
+
+.message-id-value {
+  /* A wamid runs to about 60 characters and would otherwise stretch every
+   * bubble to full width. The whole value stays available on hover.
+   */
+  max-width: 14rem;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   font-weight: 600;
-  line-height: 1.3;
   color: var(--bubble-sender);
   overflow: hidden;
   text-overflow: ellipsis;

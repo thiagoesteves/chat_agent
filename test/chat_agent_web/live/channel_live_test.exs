@@ -52,6 +52,28 @@ defmodule ChatAgentWeb.ChannelLiveTest do
     assert whatsapp =~ "from"
   end
 
+  test "shows the identifier values a message arrived with", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/channels")
+
+    :ok =
+      Channel.handle_message(:telegram, %{
+        "update_id" => 7,
+        "message" => %{
+          "chat" => %{"id" => -1_001_234_567_890},
+          "from" => %{"id" => 42},
+          "text" => "Posted from a group"
+        }
+      })
+
+    card = view |> element("section.channel-card", "telegram") |> render()
+
+    # Both values, under the names the channel documents.
+    assert card =~ "chat.id"
+    assert card =~ "-1001234567890"
+    assert card =~ "from.id"
+    assert card =~ "42"
+  end
+
   test "links each channel to its API reference", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/channels")
 

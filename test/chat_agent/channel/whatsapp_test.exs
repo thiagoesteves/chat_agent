@@ -17,6 +17,7 @@ defmodule ChatAgent.Channel.WhatsappTest do
       assert parsed.sender == "1234567890"
       # One to one only, so the reply address is the sender.
       assert parsed.conversation == "1234567890"
+      assert parsed.identifiers == [{"from", "1234567890"}, {"id", "msg_123"}]
       assert parsed.text == "Hello"
       assert %DateTime{} = parsed.received_at
       # The facade stamps the channel when it broadcasts.

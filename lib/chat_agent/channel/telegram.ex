@@ -58,6 +58,7 @@ defmodule ChatAgent.Channel.Telegram do
        id: to_string(update["update_id"]),
        sender: to_string(sender),
        conversation: to_string(chat_id),
+       identifiers: [{"chat.id", to_string(chat_id)}, {"from.id", to_string(sender)}],
        text: text
      )}
   end

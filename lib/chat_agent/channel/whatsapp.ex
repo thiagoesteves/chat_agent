@@ -42,7 +42,14 @@ defmodule ChatAgent.Channel.Whatsapp do
     })
 
     # One to one only, so the sender is also the reply address.
-    {:ok, Message.new(id: message["id"], sender: phone, conversation: phone, text: body)}
+    {:ok,
+     Message.new(
+       id: message["id"],
+       sender: phone,
+       conversation: phone,
+       identifiers: [{"from", phone}, {"id", to_string(message["id"])}],
+       text: body
+     )}
   end
 
   def handle_message(message) do
