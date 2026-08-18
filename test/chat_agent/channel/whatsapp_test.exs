@@ -64,4 +64,66 @@ defmodule ChatAgent.Channel.WhatsappTest do
                Whatsapp.send_message("1234567890", "Hello")
     end
   end
+
+  describe "authenticate/1" do
+    test "accepts the request, since the URL is what identifies the channel today" do
+      assert :ok = Whatsapp.authenticate(%Plug.Conn{})
+    end
+  end
+
+  describe "inbound_messages/1" do
+    test "flattens every message out of the entry and change envelope" do
+      params = %{
+        "object" => "whatsapp_business_account",
+        "entry" => [
+          %{"changes" => [%{"value" => %{"messages" => [%{"id" => "a"}, %{"id" => "b"}]}}]},
+          %{"changes" => [%{"value" => %{"messages" => [%{"id" => "c"}]}}]}
+        ]
+      }
+
+      assert {:ok, [%{"id" => "a"}, %{"id" => "b"}, %{"id" => "c"}]} =
+               Whatsapp.inbound_messages(params)
+    end
+
+    test "yields nothing for changes that carry no messages" do
+      params = %{
+        "object" => "whatsapp_business_account",
+        "entry" => [
+          %{"changes" => [%{"value" => %{"statuses" => [%{"id" => "a"}]}}]},
+          %{"changes" => [%{"value" => %{}}]},
+          %{}
+        ]
+      }
+
+      assert {:ok, []} = Whatsapp.inbound_messages(params)
+    end
+
+    test "rejects a body that is not a WhatsApp webhook" do
+      assert {:error, :not_found} = Whatsapp.inbound_messages(%{"object" => "other"})
+    end
+  end
+
+  describe "verify_subscription/1" do
+    test "returns the challenge when the token matches" do
+      assert {:ok, "challenge_123"} =
+               Whatsapp.verify_subscription(%{
+                 "hub.mode" => "subscribe",
+                 "hub.verify_token" => "test_verify_token",
+                 "hub.challenge" => "challenge_123"
+               })
+    end
+
+    test "rejects a mismatched token" do
+      assert {:error, :forbidden} =
+               Whatsapp.verify_subscription(%{
+                 "hub.mode" => "subscribe",
+                 "hub.verify_token" => "wrong",
+                 "hub.challenge" => "challenge_123"
+               })
+    end
+
+    test "rejects anything that is not a subscribe handshake" do
+      assert {:error, :bad_request} = Whatsapp.verify_subscription(%{"hub.mode" => "unsubscribe"})
+    end
+  end
 end

@@ -25,16 +25,19 @@ defmodule ChatAgentWeb.Router do
     live "/channels", ChannelLive
   end
 
-  scope "/webhook", ChatAgentWeb do
+  # One scope per channel, all following the same "/<channel>/webhook" shape.
+  # Only the verbs a provider actually uses are exposed: WhatsApp performs a
+  # GET subscription handshake, Telegram does not.
+  scope "/whatsapp/webhook", ChatAgentWeb do
     pipe_through :api
 
     get "/", WhatsappController, :verify
-    post "/", WhatsappController, :receive
+    post "/", WhatsappController, :handle_webhook
   end
 
   scope "/telegram/webhook", ChatAgentWeb do
     pipe_through :api
 
-    post "/", TelegramController, :receive
+    post "/", TelegramController, :handle_webhook
   end
 end

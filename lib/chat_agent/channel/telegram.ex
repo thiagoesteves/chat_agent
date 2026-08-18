@@ -45,6 +45,31 @@ defmodule ChatAgent.Channel.Telegram do
   end
 
   @impl true
+  def authenticate(conn) do
+    case Application.get_env(:chat_agent, :telegram_webhook_secret) do
+      nil ->
+        :ok
+
+      expected ->
+        if Plug.Conn.get_req_header(conn, "x-telegram-bot-api-secret-token") == [expected] do
+          :ok
+        else
+          {:error, :forbidden}
+        end
+    end
+  end
+
+  @impl true
+  def inbound_messages(%{"update_id" => _} = update), do: {:ok, [update]}
+  def inbound_messages(_params), do: {:error, :bad_request}
+
+  @impl true
+  def verify_subscription(_params) do
+    # The Bot API sets its webhook over the API and performs no handshake.
+    {:error, :not_found}
+  end
+
+  @impl true
   def send_message(chat_id, body) do
     bot_token = get_config!(:telegram_bot_token)
 

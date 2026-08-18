@@ -1,51 +1,50 @@
 defmodule ChatAgentWeb.WhatsappController do
+  @moduledoc """
+  WhatsApp webhook, at `/whatsapp/webhook`.
+
+  Everything specific to the Cloud API, proving a request came from Meta,
+  unwrapping the entry/change envelope and answering the subscription
+  handshake, lives in `ChatAgent.Channel.Whatsapp`. This controller only turns
+  those results into responses.
+  """
+
   use ChatAgentWeb, :controller
 
-  def verify(conn, %{
-        "hub.mode" => "subscribe",
-        "hub.verify_token" => token,
-        "hub.challenge" => challenge
-      }) do
-    if token == expected_verify_token() do
-      conn
-      |> put_resp_content_type("text/plain")
-      |> send_resp(200, challenge)
-    else
-      send_resp(conn, 403, "Forbidden")
+  alias ChatAgent.Channel
+  alias ChatAgent.Channel.Whatsapp
+
+  @channel :whatsapp
+
+  @doc """
+  Answer the subscription handshake Meta performs when the webhook is set.
+  """
+  def verify(conn, params) do
+    case Whatsapp.verify_subscription(params) do
+      {:ok, challenge} ->
+        conn
+        |> put_resp_content_type("text/plain")
+        |> send_resp(200, challenge)
+
+      {:error, reason} ->
+        send_error(conn, reason)
     end
   end
 
-  def verify(conn, _params) do
-    send_resp(conn, 400, "Bad Request")
+  @doc """
+  Take delivery of a webhook and hand every message it carries to the channel.
+  """
+  def handle_webhook(conn, params) do
+    with :ok <- Whatsapp.authenticate(conn),
+         {:ok, messages} <- Whatsapp.inbound_messages(params) do
+      Enum.each(messages, &Channel.handle_message(@channel, &1))
+
+      send_resp(conn, 200, "OK")
+    else
+      {:error, reason} -> send_error(conn, reason)
+    end
   end
 
-  def receive(conn, %{"object" => "whatsapp_business_account", "entry" => entries}) do
-    Enum.each(entries, &handle_entry/1)
-
-    send_resp(conn, 200, "OK")
-  end
-
-  def receive(conn, _params) do
-    send_resp(conn, 404, "Not Found")
-  end
-
-  defp handle_entry(%{"changes" => changes}) do
-    Enum.each(changes, &handle_change/1)
-  end
-
-  defp handle_entry(_entry), do: :ok
-
-  defp handle_change(%{"value" => %{"messages" => messages}}) do
-    Enum.each(messages, &ChatAgent.Channel.handle_message(:whatsapp, &1))
-  end
-
-  defp handle_change(%{"value" => %{"statuses" => _statuses}}) do
-    :ok
-  end
-
-  defp handle_change(_change), do: :ok
-
-  defp expected_verify_token do
-    Application.get_env(:chat_agent, :whatsapp_verify_token)
-  end
+  defp send_error(conn, :forbidden), do: send_resp(conn, 403, "Forbidden")
+  defp send_error(conn, :bad_request), do: send_resp(conn, 400, "Bad Request")
+  defp send_error(conn, :not_found), do: send_resp(conn, 404, "Not Found")
 end

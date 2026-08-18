@@ -35,12 +35,25 @@ Module naming follows the app prefix: `ChatAgent.*` for domain code, `ChatAgentW
 
 ### Webhook routes
 
+Webhook URLs follow one shape, `/<channel>/webhook`, with a router scope per channel.
+
 | Route | Method | Purpose |
 |---|---|---|
-| `/webhook` | GET | WhatsApp subscription verification (`hub.challenge`) |
-| `/webhook` | POST | WhatsApp inbound messages |
+| `/whatsapp/webhook` | GET | WhatsApp subscription handshake (`hub.challenge`) |
+| `/whatsapp/webhook` | POST | WhatsApp inbound messages |
 | `/telegram/webhook` | POST | Telegram inbound updates, guarded by a secret header |
 | `/channels` | GET | LiveView dashboard of every configured channel |
+
+There is one controller per channel, and one router scope per channel.
+The channel is fixed by the route rather than read out of the body, which matters for more
+than tidiness: each service authenticates differently, so letting the body pick the channel
+would let the sender pick which authentication runs.
+Only the verbs a provider actually uses are exposed: Telegram performs no handshake, so it
+has no GET route.
+
+Controllers stay thin.
+Everything service specific lives in the channel module behind the behaviour, and the
+controller only turns its results into responses.
 
 Runtime configuration comes from environment variables read in `config/runtime.exs`:
 `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`.
@@ -164,7 +177,7 @@ ChatAgent.Channel.send_message(:telegram, chat_id, "Hello")
 
 An unknown channel returns `{:error, {:unknown_channel, channel}}` rather than raising.
 
-**Adding a channel is two steps:** write the module, then register it in `config/config.exs`.
+**Adding a channel is three steps:** write the module, register it in `config/config.exs`, then give it a controller and a router scope for its webhook.
 
 ```elixir
 config :chat_agent, ChatAgent.Channel,
@@ -174,8 +187,23 @@ config :chat_agent, ChatAgent.Channel,
   ]
 ```
 
+```elixir
+scope "/my_channel/webhook", ChatAgentWeb do
+  pipe_through :api
+
+  post "/", MyChannelController, :receive
+end
+```
+
 Nothing else needs editing.
-Controllers name a channel rather than a module, and the LiveView renders whatever `ChatAgent.Channel.list/0` returns.
+The LiveView renders whatever `ChatAgent.Channel.list/0` returns, in the order configuration lists them.
+
+The behaviour also carries what each service needs at its webhook: `authenticate/1` proves the
+request came from the provider, `inbound_messages/1` unwraps whatever envelope it uses, and
+`verify_subscription/1` answers a handshake or reports `{:error, :not_found}` when the provider
+performs none.
+Keeping all three with the channel is what lets a controller be a handful of lines that map
+results to status codes.
 
 ### PubSub
 

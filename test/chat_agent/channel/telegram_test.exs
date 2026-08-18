@@ -1,5 +1,7 @@
 defmodule ChatAgent.Channel.TelegramTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
+
+  import Plug.Test, only: [conn: 3]
 
   alias ChatAgent.Channel.Message
   alias ChatAgent.Channel.Telegram
@@ -59,6 +61,58 @@ defmodule ChatAgent.Channel.TelegramTest do
 
       assert {:error, %Req.TransportError{reason: :econnrefused}} =
                Telegram.send_message(123_456, "Hello")
+    end
+  end
+
+  describe "authenticate/1" do
+    test "accepts a request carrying the configured secret" do
+      request = conn(:post, "/telegram/webhook", "")
+
+      request =
+        Plug.Conn.put_req_header(
+          request,
+          "x-telegram-bot-api-secret-token",
+          "test_telegram_webhook_secret"
+        )
+
+      assert :ok = Telegram.authenticate(request)
+    end
+
+    test "rejects a request with the wrong secret" do
+      request = conn(:post, "/telegram/webhook", "")
+      request = Plug.Conn.put_req_header(request, "x-telegram-bot-api-secret-token", "wrong")
+
+      assert {:error, :forbidden} = Telegram.authenticate(request)
+    end
+
+    test "rejects a request with no secret header at all" do
+      assert {:error, :forbidden} = Telegram.authenticate(conn(:post, "/telegram/webhook", ""))
+    end
+
+    test "accepts any request when no secret is configured" do
+      configured = Application.get_env(:chat_agent, :telegram_webhook_secret)
+      on_exit(fn -> Application.put_env(:chat_agent, :telegram_webhook_secret, configured) end)
+      Application.put_env(:chat_agent, :telegram_webhook_secret, nil)
+
+      assert :ok = Telegram.authenticate(conn(:post, "/telegram/webhook", ""))
+    end
+  end
+
+  describe "verify_subscription/1" do
+    test "reports that the Bot API performs no handshake" do
+      assert {:error, :not_found} = Telegram.verify_subscription(%{})
+    end
+  end
+
+  describe "inbound_messages/1" do
+    test "returns the update as the only payload" do
+      update = %{"update_id" => 1, "message" => %{"text" => "Hello"}}
+
+      assert {:ok, [^update]} = Telegram.inbound_messages(update)
+    end
+
+    test "rejects a body that is not an update" do
+      assert {:error, :bad_request} = Telegram.inbound_messages(%{})
     end
   end
 end
