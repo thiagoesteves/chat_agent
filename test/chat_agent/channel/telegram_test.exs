@@ -1,6 +1,7 @@
 defmodule ChatAgent.Channel.TelegramTest do
   use ExUnit.Case, async: true
 
+  alias ChatAgent.Channel.Message
   alias ChatAgent.Channel.Telegram
 
   describe "handle_message/1" do
@@ -13,7 +14,11 @@ defmodule ChatAgent.Channel.TelegramTest do
         }
       }
 
-      assert :ok = Telegram.handle_message(update)
+      assert {:ok, %Message{} = parsed} = Telegram.handle_message(update)
+      assert parsed.id == "1"
+      assert parsed.sender == "123456"
+      assert parsed.text == "Hello"
+      assert %DateTime{} = parsed.received_at
     end
 
     test "processes an unknown update" do

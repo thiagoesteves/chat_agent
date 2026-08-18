@@ -8,16 +8,20 @@ defmodule ChatAgent.Channel.Adapter do
 
     * `c:handle_message/1` takes what the channel webhook delivered, already
       unwrapped down to the smallest unit that channel talks in (a single
-      message for WhatsApp, a single update for Telegram).
+      message for WhatsApp, a single update for Telegram). When the payload is
+      an actual chat message it returns it as a `ChatAgent.Channel.Message`,
+      which `ChatAgent.Channel` broadcasts to subscribers.
     * `c:send_message/2` sends a text message back out on the same channel.
 
   ## Implementing a new channel
 
   1. Create a module under `ChatAgent.Channel` that declares
      `@behaviour ChatAgent.Channel.Adapter`.
-  2. Implement `handle_message/1` and `send_message/2`. Return `:ok` on
-     success, or `{:error, reason}` when the payload could not be processed or
-     the message could not be delivered.
+  2. Implement `handle_message/1` and `send_message/2`. Return
+     `{:ok, %ChatAgent.Channel.Message{}}` for a chat message worth showing,
+     plain `:ok` for a payload with nothing to show (a delivery receipt, say),
+     or `{:error, reason}` when the payload could not be processed or the
+     message could not be delivered.
   3. Register it under a channel key in `config/config.exs` so
      `ChatAgent.Channel` can route to it.
 
@@ -29,10 +33,10 @@ defmodule ChatAgent.Channel.Adapter do
         require Logger
 
         @impl true
-        def handle_message(%{"text" => text}) do
+        def handle_message(%{"from" => from, "text" => text}) do
           Logger.info(%{what: "my_channel_message_received", text: text})
 
-          :ok
+          {:ok, ChatAgent.Channel.Message.new(sender: from, text: text)}
         end
 
         def handle_message(_payload), do: :ok
@@ -64,9 +68,12 @@ defmodule ChatAgent.Channel.Adapter do
   Process a single inbound payload from the channel.
 
   Called by `ChatAgent.Channel.handle_message/2` for the module registered
-  under the requested channel.
+  under the requested channel. Return `{:ok, message}` for a chat message,
+  which the caller broadcasts to subscribers, or `:ok` for a payload with
+  nothing to show.
   """
-  @callback handle_message(payload :: map()) :: :ok | {:error, term()}
+  @callback handle_message(payload :: map()) ::
+              :ok | {:ok, ChatAgent.Channel.Message.t()} | {:error, term()}
 
   @doc """
   Send a plain text message out on the channel.
