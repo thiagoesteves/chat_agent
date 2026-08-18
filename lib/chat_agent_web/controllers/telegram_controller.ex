@@ -3,7 +3,7 @@ defmodule ChatAgentWeb.TelegramController do
 
   def receive(conn, %{"update_id" => _} = update) do
     if valid_secret?(conn) do
-      ChatAgent.TelegramMessageHandler.handle(update)
+      ChatAgent.Channel.handle_message(:telegram, update)
       send_resp(conn, 200, "OK")
     else
       send_resp(conn, 403, "Forbidden")

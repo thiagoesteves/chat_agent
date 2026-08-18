@@ -26,7 +26,7 @@ config :chat_agent,
   whatsapp_access_token: "test_access_token",
   whatsapp_phone_number_id: "123456789",
   whatsapp_api_version: "v20.0",
-  whatsapp_req_options: [plug: {Req.Test, ChatAgent.Whatsapp}],
+  whatsapp_req_options: [plug: {Req.Test, ChatAgent.Channel.Whatsapp}],
   telegram_bot_token: "test_telegram_bot_token",
   telegram_webhook_secret: "test_telegram_webhook_secret",
-  telegram_req_options: [plug: {Req.Test, ChatAgent.Telegram}]
+  telegram_req_options: [plug: {Req.Test, ChatAgent.Channel.Telegram}]

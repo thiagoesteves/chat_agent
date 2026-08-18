@@ -10,6 +10,14 @@ import Config
 config :chat_agent,
   generators: [timestamp_type: :utc_datetime]
 
+# Maps each chat channel to the module that speaks it, in both directions.
+# Every module implements `ChatAgent.Channel.Adapter`.
+config :chat_agent, ChatAgent.Channel,
+  adapters: [
+    whatsapp: ChatAgent.Channel.Whatsapp,
+    telegram: ChatAgent.Channel.Telegram
+  ]
+
 # Configure the endpoint
 config :chat_agent, ChatAgentWeb.Endpoint,
   url: [host: "localhost"],

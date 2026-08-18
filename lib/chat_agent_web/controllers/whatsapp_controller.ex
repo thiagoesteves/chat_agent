@@ -36,7 +36,7 @@ defmodule ChatAgentWeb.WhatsappController do
   defp handle_entry(_entry), do: :ok
 
   defp handle_change(%{"value" => %{"messages" => messages}}) do
-    Enum.each(messages, &ChatAgent.MessageHandler.handle/1)
+    Enum.each(messages, &ChatAgent.Channel.handle_message(:whatsapp, &1))
   end
 
   defp handle_change(%{"value" => %{"statuses" => _statuses}}) do
