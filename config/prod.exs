@@ -7,7 +7,10 @@ config :chat_agent, ChatAgentWeb.Endpoint,
   force_ssl: [
     rewrite_on: [:x_forwarded_proto],
     exclude: [
-      # paths: ["/health"],
+      # The liveness probe is answered on the pod's or instance's plain HTTP
+      # port, behind whatever terminates TLS, so redirecting it to https would
+      # fail the probe.
+      paths: ["/health"],
       hosts: ["localhost", "127.0.0.1"]
     ]
   ]

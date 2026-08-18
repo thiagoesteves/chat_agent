@@ -25,6 +25,14 @@ defmodule ChatAgentWeb.Router do
     live "/channels", ChannelLive
   end
 
+  # Liveness probe. It sits outside the channel scopes because it belongs to no
+  # channel, and it is unauthenticated so a load balancer can reach it.
+  scope "/", ChatAgentWeb do
+    pipe_through :api
+
+    get "/health", HealthController, :health
+  end
+
   # One scope per channel, all following the same "/<channel>/webhook" shape.
   # Only the verbs a provider actually uses are exposed: WhatsApp performs a
   # GET subscription handshake, Telegram does not.

@@ -36,7 +36,11 @@ defmodule ChatAgentWeb.Endpoint do
   end
 
   plug Plug.RequestId
-  plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
+  # ChatAgentWeb.Logger decides the level per route, which is what keeps the
+  # health probe out of the log without turning logging down everywhere.
+  plug Plug.Telemetry,
+    event_prefix: [:phoenix, :endpoint],
+    log: {ChatAgentWeb.Logger, :log, []}
 
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
