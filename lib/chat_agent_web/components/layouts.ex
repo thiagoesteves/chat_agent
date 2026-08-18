@@ -39,28 +39,21 @@ defmodule ChatAgentWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <header class="navbar px-4 sm:px-6 lg:px-8">
-      <div class="flex-1">
-        <a href="/" class="flex-1 flex w-fit items-center gap-2">
-          <img src={~p"/images/logo.svg"} width="36" />
-          <span class="text-sm font-semibold">v{Application.spec(:phoenix, :vsn)}</span>
-        </a>
-      </div>
-      <div class="flex-none">
-        <ul class="flex flex-column px-1 space-x-4 items-center">
-          <li>
-            <a href="https://phoenixframework.org/" class="btn btn-ghost">Website</a>
-          </li>
-          <li>
-            <a href="https://github.com/phoenixframework/phoenix" class="btn btn-ghost">GitHub</a>
-          </li>
-          <li>
-            <a href="https://phoenix.hexdocs.pm/overview.html" class="btn btn-primary">
-              Get Started <span aria-hidden="true">&rarr;</span>
-            </a>
-          </li>
-        </ul>
-      </div>
+    <header class="navbar app-bar px-4 sm:px-6 lg:px-8">
+      <a href="/" class="app-brand">
+        <span class="app-brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path
+              d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </span>
+        <span class="app-brand-name">ChatBot</span>
+      </a>
+
+      <.theme_toggle />
     </header>
 
     <main class="px-4 py-20 sm:px-6 lg:px-8">
@@ -88,6 +81,40 @@ defmodule ChatAgentWeb.Layouts do
     <div id={@id} aria-live="polite">
       <.flash kind={:info} flash={@flash} />
       <.flash kind={:error} flash={@flash} />
+    </div>
+    """
+  end
+
+  @doc """
+  Three way theme selector: follow the system, or pin light or dark.
+
+  The buttons only carry `data-set-theme`. `assets/js/theme.js` applies the
+  choice to `<html data-theme>` before first paint and persists it, so the
+  toggle works on any page and does not depend on a LiveView being connected.
+
+  ## Examples
+
+      <.theme_toggle />
+  """
+  def theme_toggle(assigns) do
+    ~H"""
+    <div class="theme-toggle" role="group" aria-label="Colour theme">
+      <span class="theme-toggle-indicator" aria-hidden="true"></span>
+
+      <button type="button" data-set-theme="system" title="Follow system theme">
+        <.icon name="hero-computer-desktop-micro" />
+        <span class="sr-only">System theme</span>
+      </button>
+
+      <button type="button" data-set-theme="light" title="Light theme">
+        <.icon name="hero-sun-micro" />
+        <span class="sr-only">Light theme</span>
+      </button>
+
+      <button type="button" data-set-theme="dark" title="Dark theme">
+        <.icon name="hero-moon-micro" />
+        <span class="sr-only">Dark theme</span>
+      </button>
     </div>
     """
   end

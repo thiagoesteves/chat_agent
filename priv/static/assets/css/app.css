@@ -2,7 +2,11 @@
  * It is loaded after default.css so these rules win where they overlap.
  */
 
-.channels {
+/* Palette ----------------------------------------------------------------- */
+
+.channels,
+.app-bar,
+.theme-toggle {
   --surface: #ffffff;
   --surface-sunken: #f6f7f9;
   --border: #e3e6ea;
@@ -10,13 +14,16 @@
   --text-muted: #666f7a;
   --accent: #4f46e5;
   --live: #16a34a;
-
-  font-feature-settings: "cv02", "cv03", "cv04";
-  color: var(--text);
+  --whatsapp: #25d366;
+  --telegram: #29a9eb;
+  --toggle-active: #ffffff;
 }
 
+/* Follow the system, unless a theme has been pinned to light. */
 @media (prefers-color-scheme: dark) {
-  .channels {
+  html:not([data-theme="light"]) .channels,
+  html:not([data-theme="light"]) .app-bar,
+  html:not([data-theme="light"]) .theme-toggle {
     --surface: #2e353d;
     --surface-sunken: #272e35;
     --border: #3d4650;
@@ -24,7 +31,27 @@
     --text-muted: #a2abb5;
     --accent: #818cf8;
     --live: #4ade80;
+    --toggle-active: #4b5661;
   }
+}
+
+/* An explicit choice wins in both directions. */
+html[data-theme="dark"] .channels,
+html[data-theme="dark"] .app-bar,
+html[data-theme="dark"] .theme-toggle {
+  --surface: #2e353d;
+  --surface-sunken: #272e35;
+  --border: #3d4650;
+  --text: #e6e9ed;
+  --text-muted: #a2abb5;
+  --accent: #818cf8;
+  --live: #4ade80;
+  --toggle-active: #4b5661;
+}
+
+.channels {
+  font-feature-settings: "cv02", "cv03", "cv04";
+  color: var(--text);
 }
 
 .channels code {
@@ -32,32 +59,135 @@
   font-size: 0.8125em;
 }
 
-/* The stock navbar lays its links out in one row, which overlaps the logo on
- * narrow screens. Let it wrap instead.
- */
-@media (max-width: 32rem) {
-  .navbar {
-    flex-wrap: wrap;
-    row-gap: 0.5rem;
-  }
-
-  .navbar > .flex-1 {
-    flex-basis: 100%;
-  }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
+
+/* App bar ----------------------------------------------------------------- */
+
+.app-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.app-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  background: var(--accent);
+  color: #fff;
+}
+
+.app-brand-mark svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.app-brand-name {
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+/* Theme toggle ------------------------------------------------------------ */
+
+.theme-toggle {
+  margin-left: auto;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1875rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-sunken);
+}
+
+.theme-toggle-indicator {
+  position: absolute;
+  top: 0.1875rem;
+  left: 0.1875rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: var(--toggle-active);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.16);
+  transition: transform 0.18s ease;
+}
+
+html[data-theme="light"] .theme-toggle-indicator {
+  transform: translateX(1.75rem);
+}
+
+html[data-theme="dark"] .theme-toggle-indicator {
+  transform: translateX(3.5rem);
+}
+
+.theme-toggle button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.theme-toggle button:hover {
+  color: var(--text);
+}
+
+.theme-toggle button:nth-of-type(1),
+html[data-theme="light"] .theme-toggle button:nth-of-type(2),
+html[data-theme="dark"] .theme-toggle button:nth-of-type(3) {
+  color: var(--text);
+}
+
+html[data-theme="light"] .theme-toggle button:nth-of-type(1),
+html[data-theme="dark"] .theme-toggle button:nth-of-type(1) {
+  color: var(--text-muted);
+}
+
+.theme-toggle button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Page -------------------------------------------------------------------- */
 
 /* Wider content column than the layout default, for the card grid. */
 .page-wide {
-  max-width: 64rem;
+  max-width: none;
 }
 
-/* Header ------------------------------------------------------------------ */
+main:has(.page-wide) {
+  padding-top: 2.5rem;
+}
 
 .channels-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
   margin-bottom: 1.5rem;
 }
 
@@ -78,6 +208,8 @@
   color: var(--text-muted);
 }
 
+/* Subscription badge ------------------------------------------------------ */
+
 .conn-badge {
   display: inline-flex;
   flex: none;
@@ -86,7 +218,7 @@
   padding: 0.3125rem 0.625rem;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--surface-sunken);
+  background: var(--surface);
   font-size: 0.75rem;
   font-weight: 550;
   color: var(--text-muted);
@@ -116,15 +248,20 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .conn-badge.is-live .conn-dot { animation: none; }
+  .conn-badge.is-live .conn-dot,
+  .theme-toggle-indicator {
+    animation: none;
+    transition: none;
+  }
 }
 
 /* Channel cards ----------------------------------------------------------- */
 
 .channel-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
-  gap: 1rem;
+  /* min() keeps the track from exceeding the container on narrow screens. */
+  grid-template-columns: repeat(auto-fit, minmax(min(26rem, 100%), 1fr));
+  gap: 1.25rem;
   align-items: start;
 }
 
@@ -159,13 +296,33 @@
   display: grid;
   flex: none;
   place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
   background: var(--accent);
   color: #fff;
-  font-size: 0.8125rem;
-  font-weight: 650;
+}
+
+.channel-avatar svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.channel-avatar.is-whatsapp {
+  --brand: var(--whatsapp);
+  background: var(--brand);
+}
+
+.channel-avatar.is-telegram {
+  --brand: var(--telegram);
+  background: var(--brand);
+}
+
+.channel-meta {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .channel-id h2 {
@@ -197,60 +354,134 @@
 
 /* Messages ---------------------------------------------------------------- */
 
+/* Each channel gets the chat colours of the app it speaks to, so a card is
+ * recognisable at a glance. Only inbound messages exist here, so every bubble
+ * is styled as an incoming one.
+ */
+.channel-body.is-whatsapp {
+  --chat-bg: #efeae2;
+  --bubble: #ffffff;
+  --bubble-text: #111b21;
+  --bubble-meta: #667781;
+  --bubble-sender: #027eb5;
+}
+
+.channel-body.is-telegram {
+  --chat-bg: #dfe9f2;
+  --bubble: #ffffff;
+  --bubble-text: #0f1419;
+  --bubble-meta: #707579;
+  --bubble-sender: #3390ec;
+}
+
+.channel-body {
+  --chat-bg: var(--surface);
+  --bubble: var(--surface-sunken);
+  --bubble-text: var(--text);
+  --bubble-meta: var(--text-muted);
+  --bubble-sender: var(--accent);
+
+  /* A short list should still read as a chat pane rather than a thin strip. */
+  min-height: 10rem;
+  background: var(--chat-bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .channel-body.is-whatsapp {
+    --chat-bg: #0b141a;
+    --bubble: #202c33;
+    --bubble-text: #e9edef;
+    --bubble-meta: #8696a0;
+    --bubble-sender: #53bdeb;
+  }
+
+  html:not([data-theme="light"]) .channel-body.is-telegram {
+    --chat-bg: #0e1621;
+    --bubble: #182533;
+    --bubble-text: #e9edef;
+    --bubble-meta: #7d8b99;
+    --bubble-sender: #6ab3f3;
+  }
+}
+
+html[data-theme="dark"] .channel-body.is-whatsapp {
+  --chat-bg: #0b141a;
+  --bubble: #202c33;
+  --bubble-text: #e9edef;
+  --bubble-meta: #8696a0;
+  --bubble-sender: #53bdeb;
+}
+
+html[data-theme="dark"] .channel-body.is-telegram {
+  --chat-bg: #0e1621;
+  --bubble: #182533;
+  --bubble-text: #e9edef;
+  --bubble-meta: #7d8b99;
+  --bubble-sender: #6ab3f3;
+}
+
 .message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
   margin: 0;
-  padding: 0;
+  padding: 0.75rem;
   list-style: none;
-  max-height: 24rem;
+  max-height: 28rem;
   overflow-y: auto;
 }
 
 .message {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.message:last-child {
-  border-bottom: 0;
-}
-
-.message-head {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.1875rem;
+}
+
+.message-bubble {
+  position: relative;
+  max-width: min(85%, 44rem);
+  padding: 0.375rem 0.5rem 0.375rem 0.5625rem;
+  border-radius: 0.5rem;
+  border-top-left-radius: 0.125rem;
+  background: var(--bubble);
+  color: var(--bubble-text);
+  box-shadow: 0 1px 0.5px rgb(0 0 0 / 0.13);
 }
 
 .message-sender {
-  font-size: 0.8125rem;
+  display: block;
+  font-size: 0.75rem;
   font-weight: 600;
+  line-height: 1.3;
+  color: var(--bubble-sender);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.message-head time {
-  flex: none;
-  font-size: 0.6875rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-}
-
 .message-text {
   margin: 0;
+  /* Room for the timestamp to sit on the last line, as chat apps do. */
+  padding-right: 2.75rem;
   font-size: 0.875rem;
-  line-height: 1.45;
+  line-height: 1.4;
   overflow-wrap: anywhere;
+}
+
+.message-bubble time {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.3125rem;
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--bubble-meta);
 }
 
 .channel-empty {
   margin: 0;
-  padding: 1.75rem 1rem;
+  padding: 2.5rem 1rem;
   text-align: center;
   font-size: 0.8125rem;
   line-height: 1.6;
-  color: var(--text-muted);
+  color: var(--bubble-meta);
 }
 
 .channel-empty code {
@@ -258,6 +489,7 @@
   margin-top: 0.25rem;
   padding: 0.125rem 0.375rem;
   border-radius: 0.25rem;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
+  background: var(--bubble);
+  color: var(--bubble-text);
 }
+

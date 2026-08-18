@@ -14,8 +14,8 @@ config :chat_agent,
 # Every module implements `ChatAgent.Channel.Adapter`.
 config :chat_agent, ChatAgent.Channel,
   adapters: [
-    whatsapp: ChatAgent.Channel.Whatsapp,
-    telegram: ChatAgent.Channel.Telegram
+    telegram: ChatAgent.Channel.Telegram,
+    whatsapp: ChatAgent.Channel.Whatsapp
   ]
 
 # Configure the endpoint
