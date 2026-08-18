@@ -249,10 +249,24 @@ main:has(.page-wide) {
 
 @media (prefers-reduced-motion: reduce) {
   .conn-badge.is-live .conn-dot,
-  .theme-toggle-indicator {
+  .theme-toggle-indicator,
+  [data-flash] {
     animation: none;
     transition: none;
   }
+}
+
+/* Flash notices ----------------------------------------------------------- */
+
+/* The fade a notice leaves on. Its length is stated only here: the
+   AutoDismissFlash hook reads it back before clearing the flash, so a visitor
+   who asked for reduced motion gets the rule above and no wait at all. */
+[data-flash] {
+  transition: opacity 0.4s ease-out;
+}
+
+[data-flash].flash-leaving {
+  opacity: 0;
 }
 
 /* Channel cards ----------------------------------------------------------- */

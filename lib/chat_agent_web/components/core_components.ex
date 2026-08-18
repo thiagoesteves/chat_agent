@@ -31,6 +31,10 @@ defmodule ChatAgentWeb.CoreComponents do
   @doc """
   Renders flash notices.
 
+  On a connected LiveView the `AutoDismissFlash` hook fades the notice out a few
+  seconds after it appears, or as soon as it is clicked, and clears it on the
+  server so the same message can be shown again later.
+
   ## Examples
 
       <.flash kind={:info} flash={@flash} />
@@ -58,7 +62,8 @@ defmodule ChatAgentWeb.CoreComponents do
     <div
       :if={msg = render_slot(@inner_block) || Phoenix.Flash.get(@flash, @kind)}
       id={@id}
-      data-flash
+      data-flash={@kind}
+      phx-hook="AutoDismissFlash"
       role="alert"
       class="toast toast-top toast-end z-50"
       {@rest}

@@ -28,6 +28,7 @@ lib/
     live/                   # LiveView pages
     components/             # layouts and core components
 priv/static/assets/         # hand-maintained, there is no asset build step
+  js/hooks/                 # one file per LiveView hook, registered in js/app.js
 test/support/               # ConnCase and other test helpers
 ```
 
@@ -215,6 +216,18 @@ Broadcast from the facade, subscribe from LiveView.
 
 Real-time pages live in `lib/chat_agent_web/live/`.
 Subscribe inside `if connected?(socket)` so the static render does no subscribing.
+
+### Client hooks
+
+One file per hook in `priv/static/assets/js/hooks/`, named after the hook it exports, imported into `js/app.js` and registered in the `Hooks` map passed to `LiveSocket`.
+There is no bundler, so the `.js` extension is part of the import path the browser fetches.
+
+A hook that dismisses something should tell the server rather than only change the DOM.
+`AutoDismissFlash` pushes `lv:clear-flash`, which LiveView handles natively, so the flash leaves the socket and LiveView removes the element.
+Hiding the node instead leaves the flash set on the server, and the next identical message produces no diff and is never seen.
+
+Durations that the visitor can see belong in CSS, where `prefers-reduced-motion` can reach them.
+`AutoDismissFlash` reads the fade length back out of the computed style rather than repeating it in JavaScript.
 
 ---
 
