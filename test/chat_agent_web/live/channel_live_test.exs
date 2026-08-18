@@ -41,6 +41,27 @@ defmodule ChatAgentWeb.ChannelLiveTest do
     refute has_element?(view, ".channels-header .conn-badge")
   end
 
+  test "names the identifiers each channel reports", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/channels")
+
+    telegram = view |> element("section.channel-card", "telegram") |> render()
+    assert telegram =~ "chat.id"
+    assert telegram =~ "from.id"
+
+    whatsapp = view |> element("section.channel-card", "whatsapp") |> render()
+    assert whatsapp =~ "from"
+  end
+
+  test "links each channel to its API reference", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/channels")
+
+    assert has_element?(view, ~s{#reference-telegram a[href^="https://core.telegram.org"]})
+    assert has_element?(view, ~s{#reference-whatsapp a[href^="https://developers.facebook.com"]})
+
+    # The module name moved out of the header and into the reference panel.
+    assert has_element?(view, "#reference-telegram", "ChatAgent.Channel.Telegram")
+  end
+
   test "gives each channel its own brand icon", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/channels")
 

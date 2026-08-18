@@ -32,6 +32,12 @@ defmodule ChatAgentWeb.ChannelLive do
      socket
      |> assign(:page_title, "Channels")
      |> assign(:channels, channels)
+     |> assign(
+       :references,
+       Map.new(channels, fn {channel, module} ->
+         {channel, module.reference()}
+       end)
+     )
      |> assign(:subscribed, subscribed)
      |> assign(:messages, Map.new(channels, fn {channel, _module} -> {channel, []} end))}
   end
@@ -64,9 +70,16 @@ defmodule ChatAgentWeb.ChannelLive do
                 <span class={["channel-avatar", "is-#{channel}"]}>
                   <.channel_icon channel={channel} />
                 </span>
-                <div>
+                <div class="channel-names">
                   <h2>{channel}</h2>
-                  <code>{inspect(module)}</code>
+                  <div class="channel-fields">
+                    <code :for={{name, _meaning} <- @references[channel].fields}>{name}</code>
+                    <.channel_reference
+                      channel={channel}
+                      module={module}
+                      reference={@references[channel]}
+                    />
+                  </div>
                 </div>
               </div>
               <div class="channel-meta">
@@ -101,6 +114,37 @@ defmodule ChatAgentWeb.ChannelLive do
         </div>
       </div>
     </Layouts.app>
+    """
+  end
+
+  attr :channel, :atom, required: true
+  attr :module, :atom, required: true
+  attr :reference, :map, required: true
+
+  defp channel_reference(assigns) do
+    ~H"""
+    <details class="channel-ref" id={"reference-#{@channel}"}>
+      <summary title={"What #{@channel} reports"}>
+        <span aria-hidden="true">?</span>
+        <span class="sr-only">What {@channel} reports</span>
+      </summary>
+
+      <div class="channel-ref-panel">
+        <dl>
+          <div :for={{name, meaning} <- @reference.fields}>
+            <dt><code>{name}</code></dt>
+            <dd>{meaning}</dd>
+          </div>
+        </dl>
+
+        <footer>
+          <code>{inspect(@module)}</code>
+          <a href={@reference.url} target="_blank" rel="noopener noreferrer">
+            API reference <span aria-hidden="true">&#8599;</span>
+          </a>
+        </footer>
+      </div>
+    </details>
     """
   end
 

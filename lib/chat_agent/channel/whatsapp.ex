@@ -18,6 +18,21 @@ defmodule ChatAgent.Channel.Whatsapp do
   ### ==========================================================================
 
   @impl true
+  def reference do
+    %{
+      url: "https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples",
+      fields: [
+        {"from",
+         "The sender's phone number in international format. The Cloud API carries one to " <>
+           "one conversations only, so this is also where a reply goes."},
+        {"id",
+         "The message's own identifier, a wamid value, unique across the Cloud API rather " <>
+           "than only within the conversation."}
+      ]
+    }
+  end
+
+  @impl true
   def handle_message(%{"from" => phone, "text" => %{"body" => body}} = message) do
     Logger.info(%{
       what: "whatsapp_message_received",
@@ -26,7 +41,8 @@ defmodule ChatAgent.Channel.Whatsapp do
       message_id: message["id"]
     })
 
-    {:ok, Message.new(id: message["id"], sender: phone, text: body)}
+    # One to one only, so the sender is also the reply address.
+    {:ok, Message.new(id: message["id"], sender: phone, conversation: phone, text: body)}
   end
 
   def handle_message(message) do

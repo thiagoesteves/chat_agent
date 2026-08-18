@@ -17,22 +17,49 @@ defmodule ChatAgent.Channel.Telegram do
   ### ==========================================================================
 
   @impl true
+  def reference do
+    %{
+      url: "https://core.telegram.org/bots/api#message",
+      fields: [
+        {"chat.id",
+         "The conversation, and the value sendMessage takes to reply. Positive for a " <>
+           "private chat, where it equals the user's own id, negative for a group or channel."},
+        {"from.id",
+         "Who sent the message. Equal to chat.id in a private chat, but a person inside " <>
+           "the group otherwise. Absent on channel posts."}
+      ]
+    }
+  end
+
+  @impl true
   def handle_message(
         %{
-          "message" => %{
-            "chat" => %{"id" => chat_id},
-            "text" => text
-          }
+          "message" =>
+            %{
+              "chat" => %{"id" => chat_id},
+              "text" => text
+            } = message
         } = update
       ) do
+    # `from` names the person, `chat` names the conversation. They agree in a
+    # private chat and diverge in a group, so a reply must use the chat.
+    sender = get_in(message, ["from", "id"]) || chat_id
+
     Logger.info(%{
       what: "telegram_message_received",
       chat_id: chat_id,
+      from_id: sender,
       text: text,
       update_id: update["update_id"]
     })
 
-    {:ok, Message.new(id: to_string(update["update_id"]), sender: to_string(chat_id), text: text)}
+    {:ok,
+     Message.new(
+       id: to_string(update["update_id"]),
+       sender: to_string(sender),
+       conversation: to_string(chat_id),
+       text: text
+     )}
   end
 
   def handle_message(update) do

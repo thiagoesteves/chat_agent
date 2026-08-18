@@ -19,8 +19,35 @@ defmodule ChatAgent.Channel.TelegramTest do
       assert {:ok, %Message{} = parsed} = Telegram.handle_message(update)
       assert parsed.id == "1"
       assert parsed.sender == "123456"
+      assert parsed.conversation == "123456"
       assert parsed.text == "Hello"
       assert %DateTime{} = parsed.received_at
+    end
+
+    test "separates the person from the conversation in a group" do
+      update = %{
+        "update_id" => 2,
+        "message" => %{
+          "chat" => %{"id" => -1_001_234_567_890},
+          "from" => %{"id" => 42},
+          "text" => "Hello"
+        }
+      }
+
+      assert {:ok, %Message{} = parsed} = Telegram.handle_message(update)
+      assert parsed.sender == "42"
+      assert parsed.conversation == "-1001234567890"
+    end
+
+    test "falls back to the chat when the payload names no sender" do
+      update = %{
+        "update_id" => 3,
+        "message" => %{"chat" => %{"id" => 99}, "text" => "Hello"}
+      }
+
+      assert {:ok, %Message{} = parsed} = Telegram.handle_message(update)
+      assert parsed.sender == "99"
+      assert parsed.conversation == "99"
     end
 
     test "processes an unknown update" do
@@ -95,6 +122,16 @@ defmodule ChatAgent.Channel.TelegramTest do
       Application.put_env(:chat_agent, :telegram_webhook_secret, nil)
 
       assert :ok = Telegram.authenticate(conn(:post, "/telegram/webhook", ""))
+    end
+  end
+
+  describe "reference/0" do
+    test "names the identifiers and where they are documented" do
+      reference = Telegram.reference()
+
+      assert reference.url =~ "core.telegram.org"
+      assert {"chat.id", _} = Enum.find(reference.fields, &match?({"chat.id", _}, &1))
+      assert {"from.id", _} = Enum.find(reference.fields, &match?({"from.id", _}, &1))
     end
   end
 
