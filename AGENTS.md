@@ -27,8 +27,13 @@ lib/
     controllers/            # webhook endpoints, one controller per service
     live/                   # LiveView pages
     components/             # layouts and core components
-priv/static/assets/         # hand-maintained, there is no asset build step
+assets/                     # asset sources, built by tailwind and esbuild
+  css/app.css               # Tailwind and daisyUI, then this project's own CSS
+  js/app.js                 # bundle entry point, starts the LiveSocket
+  js/theme.js               # applied before first paint, so no theme flash
   js/hooks/                 # one file per LiveView hook, registered in js/app.js
+  vendor/                   # Tailwind plugins for daisyUI and heroicons
+priv/static/assets/         # build output, gitignored, never edited by hand
 test/support/               # ConnCase and other test helpers
 ```
 
@@ -74,6 +79,12 @@ Route-specific logging rules belong in that module, not in a plug bolted onto a 
 ```bash
 # Install deps and compile (warnings as errors)
 mix do deps.get + compile --warnings-as-errors
+
+# Everything a fresh clone needs: deps, asset tool binaries, first asset build
+mix setup
+
+# Build assets once, without starting the server
+mix assets.build
 
 # Run locally
 mix phx.server
@@ -227,8 +238,7 @@ Subscribe inside `if connected?(socket)` so the static render does no subscribin
 
 ### Client hooks
 
-One file per hook in `priv/static/assets/js/hooks/`, named after the hook it exports, imported into `js/app.js` and registered in the `Hooks` map passed to `LiveSocket`.
-There is no bundler, so the `.js` extension is part of the import path the browser fetches.
+One file per hook in `assets/js/hooks/`, named after the hook it exports, imported into `js/app.js` and registered in the `Hooks` map passed to `LiveSocket`.
 
 A hook that dismisses something should tell the server rather than only change the DOM.
 `AutoDismissFlash` pushes `lv:clear-flash`, which LiveView handles natively, so the flash leaves the socket and LiveView removes the element.
@@ -520,13 +530,26 @@ The PLT is cached separately from `_build` and `deps`.
 
 ## Frontend Assets
 
-This project was generated with `--no-assets`, so **there is no bundler and no asset build step**.
-Everything under `priv/static/assets/` is hand-maintained and served as written.
+Sources live in `assets/`, and `priv/static/assets/` holds only build output, which is gitignored.
+Edit `assets/`, never the built files.
 
-- `js/app.js` is an ES module loaded with `<script type="module">`. It starts the LiveSocket
-- `js/vendor/` holds the Phoenix and LiveView ES module builds, copied from `deps/`. Refresh them with the commands in the header of `app.js` after upgrading either dependency
-- `css/app.css` holds the application styles and is loaded **after** `default.css` so it wins where the two overlap
-- `default.css` is a curated subset shipped by the generator. It contains only the utility classes the generated files use, so an arbitrary utility class will silently do nothing. Check it is present before relying on it, or write the CSS by hand
+- `assets/css/app.css` is the single stylesheet: Tailwind v4 and daisyUI at the top, then this project's own hand written rules, which win where the two overlap. Tailwind v4 needs no `tailwind.config.js`; keep the `@import "tailwindcss" source(none)` and `@source` lines, since the `@source` paths are what make it scan the HEEx for classes in use
+- `assets/js/app.js` is the bundle entry point. Dependencies resolve from `deps/` through `NODE_PATH`, so import `phoenix` and `phoenix_live_view` as packages rather than checking a copy in
+- `assets/js/theme.js` is a second entry point, loaded synchronously ahead of the stylesheet so the saved theme is applied before first paint. Do not defer it
+- `assets/js/hooks/` holds one file per LiveView hook
+- `assets/vendor/` holds the Tailwind plugins for daisyUI and heroicons. Update them from their releases rather than editing them, and note the icons themselves come from the `heroicons` dependency in `mix.exs`
+
+`tailwind` and `esbuild` install their own platform binaries, so there is no Node toolchain to manage and no `package.json` unless a dependency is installed with npm.
+
+| Task | Command |
+|---|---|
+| Install the tool binaries | `mix assets.setup` |
+| Build once | `mix assets.build` |
+| Build for a release | `mix assets.deploy` (minifies, then digests) |
+| Rebuild while developing | nothing, `mix phx.server` watches both |
+
+The test suite does not read the built files, so CI needs no asset step.
+A release does: `mix assets.deploy` before `mix release`.
 
 ---
 

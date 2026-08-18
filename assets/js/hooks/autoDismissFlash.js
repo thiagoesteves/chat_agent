@@ -22,7 +22,7 @@ const AutoDismissFlash = {
     clearTimeout(this.timer);
     this.el.classList.add("flash-leaving");
 
-    // The fade is styled in app.css, so its length is read back from there
+    // The fade is styled in assets/css/app.css, so its length is read back
     // rather than repeated here. A visitor who asked for reduced motion gets
     // 0s and the notice goes at once.
     const fadeMs =

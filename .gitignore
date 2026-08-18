@@ -28,3 +28,14 @@ chat_agent-*.tar
 # Dialyzer PLTs are build artifacts, cache them in CI rather than commit them.
 /priv/plts/
 
+# Assets are built from assets/ by tailwind and esbuild, so the output is not
+# checked in. Run `mix assets.build` (or start the server, which watches them).
+/priv/static/assets/
+
+# Digested assets cache, written by `mix phx.digest` during assets.deploy.
+/priv/static/cache_manifest.json
+
+# In case a dependency is installed with npm rather than vendored.
+/assets/node_modules/
+npm-debug.log
+

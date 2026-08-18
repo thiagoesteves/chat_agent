@@ -14,7 +14,10 @@ config :chat_agent, ChatAgentWeb.Endpoint,
   code_reloader: true,
   debug_errors: true,
   secret_key_base: "vmGmpIiPs/SXLRvgz2nfalkx5sNiPWKtbwktEYoG0MA2WMAf8985pnZFaw3F7feG",
-  watchers: []
+  watchers: [
+    esbuild: {Esbuild, :install_and_run, [:chat_agent, ~w(--sourcemap=inline --watch)]},
+    tailwind: {Tailwind, :install_and_run, [:chat_agent, ~w(--watch)]}
+  ]
 
 # ## SSL Support
 #
