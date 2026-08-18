@@ -20,7 +20,7 @@ defmodule ChatAgentWeb.TelegramController do
   @doc """
   Take delivery of an update and hand it to the channel.
   """
-  def receive(conn, params) do
+  def handle_webhook(conn, params) do
     with :ok <- Telegram.authenticate(conn),
          {:ok, updates} <- Telegram.inbound_messages(params) do
       Enum.each(updates, &Channel.handle_message(@channel, &1))

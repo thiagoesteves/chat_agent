@@ -33,7 +33,7 @@ defmodule ChatAgentWeb.WhatsappController do
   @doc """
   Take delivery of a webhook and hand every message it carries to the channel.
   """
-  def receive(conn, params) do
+  def handle_webhook(conn, params) do
     with :ok <- Whatsapp.authenticate(conn),
          {:ok, messages} <- Whatsapp.inbound_messages(params) do
       Enum.each(messages, &Channel.handle_message(@channel, &1))

@@ -32,12 +32,12 @@ defmodule ChatAgentWeb.Router do
     pipe_through :api
 
     get "/", WhatsappController, :verify
-    post "/", WhatsappController, :receive
+    post "/", WhatsappController, :handle_webhook
   end
 
   scope "/telegram/webhook", ChatAgentWeb do
     pipe_through :api
 
-    post "/", TelegramController, :receive
+    post "/", TelegramController, :handle_webhook
   end
 end
