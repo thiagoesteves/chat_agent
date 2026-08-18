@@ -47,7 +47,7 @@ defmodule ChatAgent.Channel.Whatsapp do
        id: message["id"],
        sender: phone,
        conversation: phone,
-       identifiers: [{"from", phone}, {"id", to_string(message["id"])}],
+       identifiers: [{"from", phone}, {"id", message["id"]}],
        text: body
      )}
   end

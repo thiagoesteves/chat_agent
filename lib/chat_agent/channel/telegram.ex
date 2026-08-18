@@ -63,7 +63,11 @@ defmodule ChatAgent.Channel.Telegram do
        id: to_string(update["update_id"]),
        sender: to_string(from_id || chat_id),
        conversation: to_string(chat_id),
-       identifiers: identifiers(update["update_id"], chat_id, from_id),
+       identifiers: [
+         {"chat.id", chat_id},
+         {"from.id", from_id},
+         {"update_id", update["update_id"]}
+       ],
        text: text
      )}
   end
@@ -128,14 +132,6 @@ defmodule ChatAgent.Channel.Telegram do
   ### ==========================================================================
   ### Private functions
   ### ==========================================================================
-
-  # Report only what the payload carried. A channel post has no `from`, and
-  # printing the chat id under that name would show a value that never arrived.
-  defp identifiers(update_id, chat_id, from_id) do
-    from = if from_id, do: [{"from.id", to_string(from_id)}], else: []
-
-    [{"chat.id", to_string(chat_id)}] ++ from ++ [{"update_id", to_string(update_id)}]
-  end
 
   # The Bot API answers 200 with `"ok" => false` for logical failures, so the
   # body decides the outcome rather than the status alone.

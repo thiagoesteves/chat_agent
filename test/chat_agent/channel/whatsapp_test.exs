@@ -24,6 +24,13 @@ defmodule ChatAgent.Channel.WhatsappTest do
       assert parsed.channel == nil
     end
 
+    test "leaves out an identifier the payload had no value for" do
+      message = %{"from" => "1234567890", "text" => %{"body" => "Hello"}}
+
+      assert {:ok, %Message{} = parsed} = Whatsapp.handle_message(message)
+      assert parsed.identifiers == [{"from", "1234567890"}]
+    end
+
     test "processes an unknown event" do
       assert :ok = Whatsapp.handle_message(%{"statuses" => [%{"id" => "msg_123"}]})
     end
