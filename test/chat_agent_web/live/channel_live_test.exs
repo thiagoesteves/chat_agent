@@ -117,6 +117,26 @@ defmodule ChatAgentWeb.ChannelLiveTest do
     assert html =~ "1234567890"
   end
 
+  test "keeps the newest message first in the DOM", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/channels")
+
+    for {text, id} <- [{"older message", 1}, {"newer message", 2}] do
+      :ok =
+        Channel.handle_message(:telegram, %{
+          "update_id" => id,
+          "message" => %{"chat" => %{"id" => 1}, "from" => %{"id" => 1}, "text" => text}
+        })
+    end
+
+    card = view |> element("section.channel-card", "telegram") |> render()
+
+    # The list is laid out with flex-direction: column-reverse so the newest
+    # message shows at the bottom, the way a chat client reads. That depends on
+    # the newest being first in the DOM, so the order is asserted here rather
+    # than left to the stylesheet alone.
+    assert :binary.match(card, "newer message") < :binary.match(card, "older message")
+  end
+
   test "keeps each channel's messages in its own card", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/channels")
 
