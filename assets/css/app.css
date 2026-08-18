@@ -604,12 +604,21 @@ main:has(.page-wide) {
 
 /* Each channel gets the chat colours of the app it speaks to, so a card is
  * recognisable at a glance, incoming and outgoing bubbles included.
+ *
+ * The wallpapers below are drawn here rather than taken from either service,
+ * so this repository carries no artwork that is not ours. To use a service's
+ * own wallpaper instead, drop the image into priv/static/images/ and point the
+ * channel at it, which is the whole change:
+ *
+ *   .channel-body.is-whatsapp { --chat-pattern: url("/images/whatsapp-bg.png"); }
+ *
+ * Set it in the dark blocks too if the image needs to differ by theme.
  */
 .channel-body.is-whatsapp {
   --chat-bg: #efeae2;
   --bubble: #ffffff;
   --bubble-text: #111b21;
-  --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='%23000' fill-opacity='.05'%3E%3Ccircle cx='104' cy='86' r='2.5'/%3E%3Ccircle cx='40' cy='44' r='2'/%3E%3C/g%3E%3Cg fill='none' stroke='%23000' stroke-opacity='.055' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='18' cy='22' r='8'/%3E%3Cpath d='M44 16q7 9 14 0'/%3E%3Cpath d='M78 14v14M71 21h14'/%3E%3Cpath d='M100 30l-7-12h14z'/%3E%3Cpath d='M14 62q8-10 16 0t16 0'/%3E%3Ccircle cx='66' cy='58' r='5'/%3E%3Crect x='88' y='52' width='14' height='12' rx='3'/%3E%3Cpath d='M20 96h16M28 88v16'/%3E%3Ccircle cx='58' cy='98' r='7'/%3E%3Cpath d='M88 92q8 8 16 0'/%3E%3C/g%3E%3C/svg%3E");
+  --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23000' fill-opacity='.055'%3E%3Ccircle cx='44' cy='44' r='2.5'/%3E%3Ccircle cx='112' cy='86' r='2.5'/%3E%3Ccircle cx='40' cy='122' r='2'/%3E%3Ccircle cx='152' cy='104' r='2.5'/%3E%3Ccircle cx='72' cy='150' r='2'/%3E%3C/g%3E%3Cg fill='none' stroke='%23000' stroke-opacity='.06' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='20' cy='24' r='9'/%3E%3Cpath d='M48 18q8 10 16 0'/%3E%3Cpath d='M88 12v16M80 20h16'/%3E%3Cpath d='M124 32l-8-14h16z'/%3E%3Cpath d='M148 20a8 8 0 0 1 8 8'/%3E%3Cpath d='M16 66q9-11 18 0t18 0'/%3E%3Ccircle cx='76' cy='62' r='6'/%3E%3Crect x='100' y='54' width='16' height='14' rx='4'/%3E%3Cpath d='M134 58h14v12h-14z'/%3E%3Cpath d='M134 58l7 6 7-6'/%3E%3Cpath d='M20 104h18M29 95v18'/%3E%3Ccircle cx='64' cy='106' r='8'/%3E%3Cpath d='M96 100q9 9 18 0'/%3E%3Cpath d='M132 96l6 12 6-12'/%3E%3Cpath d='M14 140q10-8 20 0'/%3E%3Crect x='52' y='134' width='14' height='14' rx='7'/%3E%3Cpath d='M88 132v16M96 140h-16'/%3E%3Ccircle cx='124' cy='142' r='6'/%3E%3Cpath d='M148 134l8 8-8 8'/%3E%3C/g%3E%3C/svg%3E");
   --bubble-out: #d9fdd3;
   --bubble-out-text: #111b21;
   --bubble-meta: #667781;
@@ -622,7 +631,7 @@ main:has(.page-wide) {
   --chat-bg: #dfe9f2;
   --bubble: #ffffff;
   --bubble-text: #0f1419;
-  --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='%23000' fill-opacity='.045'%3E%3Ccircle cx='20' cy='20' r='3'/%3E%3Ccircle cx='60' cy='34' r='2.5'/%3E%3Ccircle cx='96' cy='18' r='3'/%3E%3Ccircle cx='34' cy='70' r='2.5'/%3E%3Ccircle cx='78' cy='84' r='3'/%3E%3Ccircle cx='112' cy='62' r='2.5'/%3E%3C/g%3E%3Cg fill='none' stroke='%23000' stroke-opacity='.05' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M44 60l10-10M46 100l10-10M84 40l10-10M14 40l10-10'/%3E%3Ccircle cx='16' cy='96' r='7'/%3E%3Ccircle cx='100' cy='104' r='5'/%3E%3Ccircle cx='86' cy='60' r='9'/%3E%3C/g%3E%3C/svg%3E");
+  --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23000' fill-opacity='.05'%3E%3Ccircle cx='24' cy='24' r='3'/%3E%3Ccircle cx='72' cy='40' r='2.5'/%3E%3Ccircle cx='120' cy='20' r='3'/%3E%3Ccircle cx='40' cy='84' r='2.5'/%3E%3Ccircle cx='92' cy='104' r='3'/%3E%3Ccircle cx='140' cy='72' r='2.5'/%3E%3Ccircle cx='28' cy='150' r='2.5'/%3E%3Ccircle cx='84' cy='146' r='3'/%3E%3C/g%3E%3Cg fill='none' stroke='%23000' stroke-opacity='.05' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M52 68l12-12M54 118l12-12M100 44l12-12M18 44l12-12M132 96l12-12'/%3E%3Ccircle cx='20' cy='112' r='8'/%3E%3Ccircle cx='118' cy='128' r='6'/%3E%3Ccircle cx='100' cy='70' r='10'/%3E%3Ccircle cx='150' cy='40' r='7'/%3E%3Ccircle cx='62' cy='22' r='5'/%3E%3Ccircle cx='150' cy='150' r='9'/%3E%3C/g%3E%3C/svg%3E");
   --bubble-out: #effdde;
   --bubble-out-text: #0f1419;
   --bubble-meta: #707579;
@@ -660,7 +669,7 @@ main:has(.page-wide) {
     --chat-bg: #0b141a;
     --bubble: #202c33;
     --bubble-text: #e9edef;
-    --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='%23fff' fill-opacity='.045'%3E%3Ccircle cx='104' cy='86' r='2.5'/%3E%3Ccircle cx='40' cy='44' r='2'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.05' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='18' cy='22' r='8'/%3E%3Cpath d='M44 16q7 9 14 0'/%3E%3Cpath d='M78 14v14M71 21h14'/%3E%3Cpath d='M100 30l-7-12h14z'/%3E%3Cpath d='M14 62q8-10 16 0t16 0'/%3E%3Ccircle cx='66' cy='58' r='5'/%3E%3Crect x='88' y='52' width='14' height='12' rx='3'/%3E%3Cpath d='M20 96h16M28 88v16'/%3E%3Ccircle cx='58' cy='98' r='7'/%3E%3Cpath d='M88 92q8 8 16 0'/%3E%3C/g%3E%3C/svg%3E");
+    --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23fff' fill-opacity='.05'%3E%3Ccircle cx='44' cy='44' r='2.5'/%3E%3Ccircle cx='112' cy='86' r='2.5'/%3E%3Ccircle cx='40' cy='122' r='2'/%3E%3Ccircle cx='152' cy='104' r='2.5'/%3E%3Ccircle cx='72' cy='150' r='2'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.055' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='20' cy='24' r='9'/%3E%3Cpath d='M48 18q8 10 16 0'/%3E%3Cpath d='M88 12v16M80 20h16'/%3E%3Cpath d='M124 32l-8-14h16z'/%3E%3Cpath d='M148 20a8 8 0 0 1 8 8'/%3E%3Cpath d='M16 66q9-11 18 0t18 0'/%3E%3Ccircle cx='76' cy='62' r='6'/%3E%3Crect x='100' y='54' width='16' height='14' rx='4'/%3E%3Cpath d='M134 58h14v12h-14z'/%3E%3Cpath d='M134 58l7 6 7-6'/%3E%3Cpath d='M20 104h18M29 95v18'/%3E%3Ccircle cx='64' cy='106' r='8'/%3E%3Cpath d='M96 100q9 9 18 0'/%3E%3Cpath d='M132 96l6 12 6-12'/%3E%3Cpath d='M14 140q10-8 20 0'/%3E%3Crect x='52' y='134' width='14' height='14' rx='7'/%3E%3Cpath d='M88 132v16M96 140h-16'/%3E%3Ccircle cx='124' cy='142' r='6'/%3E%3Cpath d='M148 134l8 8-8 8'/%3E%3C/g%3E%3C/svg%3E");
   --bubble-out: #005c4b;
     --bubble-out-text: #e9edef;
     --bubble-meta: #8696a0;
@@ -673,7 +682,7 @@ main:has(.page-wide) {
     --chat-bg: #0e1621;
     --bubble: #182533;
     --bubble-text: #e9edef;
-    --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='%23fff' fill-opacity='.04'%3E%3Ccircle cx='20' cy='20' r='3'/%3E%3Ccircle cx='60' cy='34' r='2.5'/%3E%3Ccircle cx='96' cy='18' r='3'/%3E%3Ccircle cx='34' cy='70' r='2.5'/%3E%3Ccircle cx='78' cy='84' r='3'/%3E%3Ccircle cx='112' cy='62' r='2.5'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.045' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M44 60l10-10M46 100l10-10M84 40l10-10M14 40l10-10'/%3E%3Ccircle cx='16' cy='96' r='7'/%3E%3Ccircle cx='100' cy='104' r='5'/%3E%3Ccircle cx='86' cy='60' r='9'/%3E%3C/g%3E%3C/svg%3E");
+    --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23fff' fill-opacity='.045'%3E%3Ccircle cx='24' cy='24' r='3'/%3E%3Ccircle cx='72' cy='40' r='2.5'/%3E%3Ccircle cx='120' cy='20' r='3'/%3E%3Ccircle cx='40' cy='84' r='2.5'/%3E%3Ccircle cx='92' cy='104' r='3'/%3E%3Ccircle cx='140' cy='72' r='2.5'/%3E%3Ccircle cx='28' cy='150' r='2.5'/%3E%3Ccircle cx='84' cy='146' r='3'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.05' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M52 68l12-12M54 118l12-12M100 44l12-12M18 44l12-12M132 96l12-12'/%3E%3Ccircle cx='20' cy='112' r='8'/%3E%3Ccircle cx='118' cy='128' r='6'/%3E%3Ccircle cx='100' cy='70' r='10'/%3E%3Ccircle cx='150' cy='40' r='7'/%3E%3Ccircle cx='62' cy='22' r='5'/%3E%3Ccircle cx='150' cy='150' r='9'/%3E%3C/g%3E%3C/svg%3E");
   --bubble-out: #2b5278;
     --bubble-out-text: #e9edef;
     --bubble-meta: #7d8b99;
@@ -687,7 +696,7 @@ html[data-theme="dark"] .channel-body.is-whatsapp {
   --chat-bg: #0b141a;
   --bubble: #202c33;
   --bubble-text: #e9edef;
-  --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='%23fff' fill-opacity='.045'%3E%3Ccircle cx='104' cy='86' r='2.5'/%3E%3Ccircle cx='40' cy='44' r='2'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.05' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='18' cy='22' r='8'/%3E%3Cpath d='M44 16q7 9 14 0'/%3E%3Cpath d='M78 14v14M71 21h14'/%3E%3Cpath d='M100 30l-7-12h14z'/%3E%3Cpath d='M14 62q8-10 16 0t16 0'/%3E%3Ccircle cx='66' cy='58' r='5'/%3E%3Crect x='88' y='52' width='14' height='12' rx='3'/%3E%3Cpath d='M20 96h16M28 88v16'/%3E%3Ccircle cx='58' cy='98' r='7'/%3E%3Cpath d='M88 92q8 8 16 0'/%3E%3C/g%3E%3C/svg%3E");
+  --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23fff' fill-opacity='.05'%3E%3Ccircle cx='44' cy='44' r='2.5'/%3E%3Ccircle cx='112' cy='86' r='2.5'/%3E%3Ccircle cx='40' cy='122' r='2'/%3E%3Ccircle cx='152' cy='104' r='2.5'/%3E%3Ccircle cx='72' cy='150' r='2'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.055' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='20' cy='24' r='9'/%3E%3Cpath d='M48 18q8 10 16 0'/%3E%3Cpath d='M88 12v16M80 20h16'/%3E%3Cpath d='M124 32l-8-14h16z'/%3E%3Cpath d='M148 20a8 8 0 0 1 8 8'/%3E%3Cpath d='M16 66q9-11 18 0t18 0'/%3E%3Ccircle cx='76' cy='62' r='6'/%3E%3Crect x='100' y='54' width='16' height='14' rx='4'/%3E%3Cpath d='M134 58h14v12h-14z'/%3E%3Cpath d='M134 58l7 6 7-6'/%3E%3Cpath d='M20 104h18M29 95v18'/%3E%3Ccircle cx='64' cy='106' r='8'/%3E%3Cpath d='M96 100q9 9 18 0'/%3E%3Cpath d='M132 96l6 12 6-12'/%3E%3Cpath d='M14 140q10-8 20 0'/%3E%3Crect x='52' y='134' width='14' height='14' rx='7'/%3E%3Cpath d='M88 132v16M96 140h-16'/%3E%3Ccircle cx='124' cy='142' r='6'/%3E%3Cpath d='M148 134l8 8-8 8'/%3E%3C/g%3E%3C/svg%3E");
   --bubble-out: #005c4b;
   --bubble-out-text: #e9edef;
   --bubble-meta: #8696a0;
@@ -700,7 +709,7 @@ html[data-theme="dark"] .channel-body.is-telegram {
   --chat-bg: #0e1621;
   --bubble: #182533;
   --bubble-text: #e9edef;
-  --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='%23fff' fill-opacity='.04'%3E%3Ccircle cx='20' cy='20' r='3'/%3E%3Ccircle cx='60' cy='34' r='2.5'/%3E%3Ccircle cx='96' cy='18' r='3'/%3E%3Ccircle cx='34' cy='70' r='2.5'/%3E%3Ccircle cx='78' cy='84' r='3'/%3E%3Ccircle cx='112' cy='62' r='2.5'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.045' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M44 60l10-10M46 100l10-10M84 40l10-10M14 40l10-10'/%3E%3Ccircle cx='16' cy='96' r='7'/%3E%3Ccircle cx='100' cy='104' r='5'/%3E%3Ccircle cx='86' cy='60' r='9'/%3E%3C/g%3E%3C/svg%3E");
+  --chat-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23fff' fill-opacity='.045'%3E%3Ccircle cx='24' cy='24' r='3'/%3E%3Ccircle cx='72' cy='40' r='2.5'/%3E%3Ccircle cx='120' cy='20' r='3'/%3E%3Ccircle cx='40' cy='84' r='2.5'/%3E%3Ccircle cx='92' cy='104' r='3'/%3E%3Ccircle cx='140' cy='72' r='2.5'/%3E%3Ccircle cx='28' cy='150' r='2.5'/%3E%3Ccircle cx='84' cy='146' r='3'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.05' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M52 68l12-12M54 118l12-12M100 44l12-12M18 44l12-12M132 96l12-12'/%3E%3Ccircle cx='20' cy='112' r='8'/%3E%3Ccircle cx='118' cy='128' r='6'/%3E%3Ccircle cx='100' cy='70' r='10'/%3E%3Ccircle cx='150' cy='40' r='7'/%3E%3Ccircle cx='62' cy='22' r='5'/%3E%3Ccircle cx='150' cy='150' r='9'/%3E%3C/g%3E%3C/svg%3E");
   --bubble-out: #2b5278;
   --bubble-out-text: #e9edef;
   --bubble-meta: #7d8b99;
@@ -845,7 +854,10 @@ html[data-theme="dark"] .channel-body.is-telegram {
   gap: 0.5rem;
   padding: 0.625rem 0.75rem 0.75rem;
   border-top: 1px solid rgb(0 0 0 / 0.08);
-  background: var(--chat-bg);
+  /* Transparent, so the conversation's wallpaper runs behind the composer too
+   * and the card reads as one surface rather than a pane plus a toolbar.
+   */
+  background: transparent;
 }
 
 .message-form-to {
