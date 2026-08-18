@@ -12,9 +12,9 @@ env:
 jobs:
   setup:
     name: Setup
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup BEAM
         uses: erlef/setup-beam@v1
@@ -39,10 +39,10 @@ jobs:
   test:
     name: Test
     needs: setup
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup BEAM
         uses: erlef/setup-beam@v1
@@ -67,10 +67,10 @@ jobs:
   analysis:
     name: Static Analysis
     needs: setup
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup BEAM
         id: beam
