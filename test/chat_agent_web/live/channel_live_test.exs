@@ -107,6 +107,99 @@ defmodule ChatAgentWeb.ChannelLiveTest do
     assert has_element?(view, "#reference-telegram", "ChatAgent.Channel.Telegram")
   end
 
+  describe "sending a reply" do
+    setup %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/channels")
+
+      :ok =
+        Channel.handle_message(:telegram, %{
+          "update_id" => 119_773_467,
+          "message" => %{
+            "chat" => %{"id" => 8_827_630_462},
+            "from" => %{"id" => 8_827_630_462},
+            "text" => "Hi, can you help me?"
+          }
+        })
+
+      # The channel posts from the LiveView process, not the test process.
+      Req.Test.allow(ChatAgent.Channel.Telegram, self(), view.pid)
+
+      %{view: view}
+    end
+
+    test "addresses the conversation the newest message arrived on", %{view: view} do
+      Req.Test.stub(ChatAgent.Channel.Telegram, fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        payload = Jason.decode!(body)
+
+        assert payload["chat_id"] == "8827630462"
+        assert payload["text"] == "On it, checking now"
+
+        Req.Test.json(conn, %{"ok" => true, "result" => %{"message_id" => 1}})
+      end)
+
+      html =
+        view
+        |> form("#send-form-telegram", send: %{body: "On it, checking now"})
+        |> render_submit()
+
+      assert html =~ "Sent on telegram to 8827630462"
+    end
+
+    test "clears the composer once the message is away", %{view: view} do
+      Req.Test.stub(ChatAgent.Channel.Telegram, fn conn ->
+        Req.Test.json(conn, %{"ok" => true, "result" => %{"message_id" => 1}})
+      end)
+
+      view |> form("#send-form-telegram", send: %{body: "On it"}) |> render_submit()
+
+      assert view |> element("#send-telegram-body") |> render() =~ ~s(value="")
+    end
+
+    test "reports a failure the service answered with", %{view: view} do
+      Req.Test.stub(ChatAgent.Channel.Telegram, fn conn ->
+        Req.Test.json(conn, %{"ok" => false, "description" => "chat not found"})
+      end)
+
+      html = view |> form("#send-form-telegram", send: %{body: "On it"}) |> render_submit()
+
+      assert html =~ "Could not send on telegram"
+      assert html =~ "chat not found"
+    end
+
+    test "refuses an empty message rather than posting it", %{view: view} do
+      # No stub: any request to the service fails the test.
+      html = view |> form("#send-form-telegram", send: %{body: "   "}) |> render_submit()
+
+      assert html =~ "Nothing to send on telegram"
+    end
+
+    test "refuses to send on a channel with no conversation yet", %{view: view} do
+      html =
+        render_submit(view, "send_message", %{
+          "send" => %{"channel" => "whatsapp", "body" => "Hello"}
+        })
+
+      assert html =~ "No conversation on whatsapp to reply to yet"
+    end
+
+    test "refuses to send on a channel it does not know", %{view: view} do
+      html =
+        render_submit(view, "send_message", %{
+          "send" => %{"channel" => "carrier_pigeon", "body" => "Hello"}
+        })
+
+      assert html =~ "Unknown channel"
+    end
+  end
+
+  test "disables the composer until a conversation exists", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/channels")
+
+    assert view |> element("#send-form-whatsapp button") |> render() =~ "disabled"
+    assert view |> element("#send-form-whatsapp") |> render() =~ "Nothing to reply to yet"
+  end
+
   test "gives each channel its own brand icon", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/channels")
 

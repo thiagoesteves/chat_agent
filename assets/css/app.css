@@ -612,6 +612,8 @@ main:has(.page-wide) {
   --bubble-text: #111b21;
   --bubble-meta: #667781;
   --bubble-sender: #027eb5;
+  --send: #25d366;
+  --send-text: #0b3d21;
 }
 
 .channel-body.is-telegram {
@@ -620,6 +622,8 @@ main:has(.page-wide) {
   --bubble-text: #0f1419;
   --bubble-meta: #707579;
   --bubble-sender: #3390ec;
+  --send: #3390ec;
+  --send-text: #ffffff;
 }
 
 .channel-body {
@@ -628,6 +632,8 @@ main:has(.page-wide) {
   --bubble-text: var(--text);
   --bubble-meta: var(--text-muted);
   --bubble-sender: var(--accent);
+  --send: var(--accent);
+  --send-text: #ffffff;
 
   /* A short list should still read as a chat pane rather than a thin strip. */
   display: flex;
@@ -640,6 +646,8 @@ main:has(.page-wide) {
 
 @media (prefers-color-scheme: dark) {
   html:not([data-theme="light"]) .channel-body.is-whatsapp {
+    --send: #00a884;
+    --send-text: #0b141a;
     --chat-bg: #0b141a;
     --bubble: #202c33;
     --bubble-text: #e9edef;
@@ -648,6 +656,8 @@ main:has(.page-wide) {
   }
 
   html:not([data-theme="light"]) .channel-body.is-telegram {
+    --send: #4a9eea;
+    --send-text: #0e1621;
     --chat-bg: #0e1621;
     --bubble: #182533;
     --bubble-text: #e9edef;
@@ -657,6 +667,8 @@ main:has(.page-wide) {
 }
 
 html[data-theme="dark"] .channel-body.is-whatsapp {
+  --send: #00a884;
+  --send-text: #0b141a;
   --chat-bg: #0b141a;
   --bubble: #202c33;
   --bubble-text: #e9edef;
@@ -665,6 +677,8 @@ html[data-theme="dark"] .channel-body.is-whatsapp {
 }
 
 html[data-theme="dark"] .channel-body.is-telegram {
+  --send: #4a9eea;
+  --send-text: #0e1621;
   --chat-bg: #0e1621;
   --bubble: #182533;
   --bubble-text: #e9edef;
@@ -778,3 +792,95 @@ html[data-theme="dark"] .channel-body.is-telegram {
   color: var(--bubble-text);
 }
 
+/* Composer --------------------------------------------------------------- */
+
+.message-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem 0.75rem;
+  border-top: 1px solid rgb(0 0 0 / 0.08);
+  background: var(--chat-bg);
+}
+
+.message-form-to {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.375rem;
+  margin: 0;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+
+.message-form-to-label {
+  color: var(--bubble-meta);
+}
+
+.message-form-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+/* The input arrives wrapped in a fieldset by the core component. */
+.message-form-row .fieldset {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.message-form-row input[type="text"] {
+  width: 100%;
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bubble);
+  color: var(--bubble-text);
+  font: inherit;
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.message-form-row input[type="text"]::placeholder {
+  color: var(--bubble-meta);
+}
+
+.message-form-row input[type="text"]:focus {
+  border-color: var(--send);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--send) 25%, transparent);
+}
+
+.message-form-row input[type="text"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.message-send {
+  flex: none;
+  height: 2.25rem;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--send);
+  color: var(--send-text);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.message-send:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.message-send:focus-visible {
+  outline: 2px solid var(--send);
+  outline-offset: 2px;
+}
+
+.message-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
