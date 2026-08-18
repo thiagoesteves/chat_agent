@@ -1,14 +1,14 @@
-// This project is generated with --no-assets, so there is no bundler. The
-// Phoenix and LiveView ES module builds are vendored under ./vendor and
-// imported directly by the browser. Refresh them with:
-//
-//   cp deps/phoenix/priv/static/phoenix.mjs priv/static/assets/js/vendor/
-//   cp deps/phoenix_live_view/priv/static/phoenix_live_view.esm.js priv/static/assets/js/vendor/
-import { Socket } from "./vendor/phoenix.mjs";
-import { LiveSocket } from "./vendor/phoenix_live_view.esm.js";
-// One file per hook under ./hooks, named after the hook it exports. Without a
-// bundler the extension is part of the URL the browser fetches, so keep it.
-import AutoDismissFlash from "./hooks/autoDismissFlash.js";
+// Bundled by esbuild into priv/static/assets/js/app.js. Dependencies are
+// resolved from deps/ through NODE_PATH, so `phoenix` and `phoenix_live_view`
+// are the packages themselves rather than a copy checked in here.
+
+// Handles method=PUT/DELETE on links and buttons.
+import "phoenix_html";
+// Establish Phoenix Socket and LiveView configuration.
+import { Socket } from "phoenix";
+import { LiveSocket } from "phoenix_live_view";
+// One file per hook under ./hooks, named after the hook it exports.
+import AutoDismissFlash from "./hooks/autoDismissFlash";
 
 const Hooks = {
   AutoDismissFlash,

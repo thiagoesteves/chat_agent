@@ -56,6 +56,20 @@ defmodule ChatAgent.MixProject do
       {:bandit, "~> 1.5"},
       {:req, "~> 0.6.1"},
 
+      # Asset build. Both install a platform binary on first use and are only
+      # needed while developing: a release serves what `assets.deploy` built.
+      # Heroicons is the icon source the Tailwind plugin in assets/vendor reads,
+      # so it is fetched but neither compiled nor started.
+      {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
+      {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
+      {:heroicons,
+       github: "tailwindlabs/heroicons",
+       tag: "v2.2.0",
+       sparse: "optimized",
+       app: false,
+       compile: false,
+       depth: 1},
+
       # Static analysis, security, and documentation. None of these ship in the
       # release: they are build-time only, hence `runtime: false`.
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
@@ -118,7 +132,16 @@ defmodule ChatAgent.MixProject do
   # See `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get"],
+      setup: ["deps.get", "assets.setup", "assets.build"],
+      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
+      # Compiling first is what makes colocated JS and the icon set available to
+      # the bundler, so the order matters.
+      "assets.build": ["compile", "tailwind chat_agent", "esbuild chat_agent"],
+      "assets.deploy": [
+        "tailwind chat_agent --minify",
+        "esbuild chat_agent --minify",
+        "phx.digest"
+      ],
       precommit: [
         "compile --warnings-as-errors",
         "deps.unlock --unused",
