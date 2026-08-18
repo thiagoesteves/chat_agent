@@ -30,6 +30,35 @@ defmodule ChatAgentWeb.ChannelLiveTest do
     assert html =~ "Subscribed"
   end
 
+  test "reports subscription per channel, not once for the page", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/channels")
+
+    for channel <- ["whatsapp", "telegram"] do
+      card = view |> element("section.channel-card", channel) |> render()
+      assert card =~ "Subscribed"
+    end
+
+    refute has_element?(view, ".channels-header .conn-badge")
+  end
+
+  test "gives each channel its own brand icon", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/channels")
+
+    assert has_element?(view, ".channel-avatar.is-whatsapp svg")
+    assert has_element?(view, ".channel-avatar.is-telegram svg")
+  end
+
+  test "carries the app brand and a three way theme toggle", %{conn: conn} do
+    {:ok, view, html} = live(conn, ~p"/channels")
+
+    assert html =~ "ChatBot"
+    refute html =~ "phoenixframework.org"
+
+    for theme <- ~w(system light dark) do
+      assert has_element?(view, ~s(.theme-toggle button[data-set-theme="#{theme}"]))
+    end
+  end
+
   test "appends a message received on a channel", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/channels")
 
