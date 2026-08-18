@@ -113,6 +113,7 @@ html[data-theme="dark"] .theme-toggle {
 /* Theme toggle ------------------------------------------------------------ */
 
 .theme-toggle {
+  margin-left: auto;
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -179,7 +180,7 @@ html[data-theme="dark"] .theme-toggle button:nth-of-type(1) {
 
 /* Wider content column than the layout default, for the card grid. */
 .page-wide {
-  max-width: 96rem;
+  max-width: none;
 }
 
 main:has(.page-wide) {
@@ -258,7 +259,8 @@ main:has(.page-wide) {
 
 .channel-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(26rem, 1fr));
+  /* min() keeps the track from exceeding the container on narrow screens. */
+  grid-template-columns: repeat(auto-fit, minmax(min(26rem, 100%), 1fr));
   gap: 1.25rem;
   align-items: start;
 }
@@ -294,24 +296,26 @@ main:has(.page-wide) {
   display: grid;
   flex: none;
   place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 0.625rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
   background: var(--accent);
   color: #fff;
 }
 
 .channel-avatar svg {
-  width: 1.375rem;
-  height: 1.375rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .channel-avatar.is-whatsapp {
-  background: var(--whatsapp);
+  --brand: var(--whatsapp);
+  background: var(--brand);
 }
 
 .channel-avatar.is-telegram {
-  background: var(--telegram);
+  --brand: var(--telegram);
+  background: var(--brand);
 }
 
 .channel-meta {
@@ -392,6 +396,7 @@ main:has(.page-wide) {
 
 .message-text {
   margin: 0;
+  max-width: 80ch;
   font-size: 0.875rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
