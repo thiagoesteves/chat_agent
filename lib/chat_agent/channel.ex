@@ -115,20 +115,6 @@ defmodule ChatAgent.Channel do
   end
 
   @doc """
-  Look up the module registered for `channel`.
-
-  ## Examples
-
-      iex> ChatAgent.Channel.fetch(:telegram)
-      {:ok, ChatAgent.Channel.Telegram}
-
-      iex> ChatAgent.Channel.fetch(:carrier_pigeon)
-      :error
-  """
-  @spec fetch(channel :: channel()) :: {:ok, module()} | :error
-  def fetch(channel), do: Keyword.fetch(list(), channel)
-
-  @doc """
   Subscribe the calling process to every chat message received on `channel`.
 
   Subscribers receive `{:message, %ChatAgent.Channel.Message{}}`.
