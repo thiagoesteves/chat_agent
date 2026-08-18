@@ -28,5 +28,12 @@ defmodule ChatAgent.Channel.MessageTest do
     test "leaves identifiers empty when none are given" do
       assert Message.new(sender: "1", conversation: "1", text: "Hello").identifiers == []
     end
+
+    test "treats a message as inbound unless told otherwise" do
+      assert Message.new(sender: "1", conversation: "1", text: "Hello").direction == :inbound
+
+      assert Message.new(sender: "you", conversation: "1", text: "Hi", direction: :outbound).direction ==
+               :outbound
+    end
   end
 end

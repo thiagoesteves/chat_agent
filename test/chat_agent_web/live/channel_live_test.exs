@@ -146,6 +146,39 @@ defmodule ChatAgentWeb.ChannelLiveTest do
       assert html =~ "Sent on telegram to 8827630462"
     end
 
+    test "shows the reply in the conversation, marked as sent from here", %{view: view} do
+      Req.Test.stub(ChatAgent.Channel.Telegram, fn conn ->
+        Req.Test.json(conn, %{"ok" => true, "result" => %{"message_id" => 1}})
+      end)
+
+      view |> form("#send-form-telegram", send: %{body: "On it, checking now"}) |> render_submit()
+
+      card = view |> element("section.channel-card", "telegram") |> render()
+
+      assert card =~ "On it, checking now"
+      assert card =~ "is-outbound"
+      assert card =~ "sent from this dashboard"
+      # Addressed to the conversation it was sent on.
+      assert card =~ "8827630462"
+    end
+
+    test "keeps addressing the person who wrote in, not our own reply", %{view: view} do
+      Req.Test.stub(ChatAgent.Channel.Telegram, fn conn ->
+        Req.Test.json(conn, %{"ok" => true, "result" => %{"message_id" => 1}})
+      end)
+
+      view |> form("#send-form-telegram", send: %{body: "On it"}) |> render_submit()
+
+      # The reply is now the newest message, but a further reply still goes to
+      # the conversation rather than to ourselves.
+      assert view |> element("#send-form-telegram .message-form-to") |> render() =~
+               "chat.id · from.id"
+
+      view |> form("#send-form-telegram", send: %{body: "And another"}) |> render_submit()
+
+      assert view |> element("section.channel-card", "telegram") |> render() =~ "And another"
+    end
+
     test "clears the composer once the message is away", %{view: view} do
       Req.Test.stub(ChatAgent.Channel.Telegram, fn conn ->
         Req.Test.json(conn, %{"ok" => true, "result" => %{"message_id" => 1}})

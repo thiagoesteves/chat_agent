@@ -97,10 +97,17 @@ defmodule ChatAgentWeb.ChannelLive do
   end
 
   defp recipient(socket, channel) do
-    case socket.assigns.messages[channel] do
-      [%Message{conversation: conversation} | _older] -> conversation
-      _none -> nil
+    case newest_inbound(socket.assigns.messages[channel]) do
+      %Message{conversation: conversation} -> conversation
+      nil -> nil
     end
+  end
+
+  # A reply is addressed to whoever last wrote in, so replies this app already
+  # sent are skipped: answering our own message would say nothing about who is
+  # waiting for an answer.
+  defp newest_inbound(messages) do
+    Enum.find(messages || [], &(&1.direction == :inbound))
   end
 
   @impl true
@@ -150,12 +157,18 @@ defmodule ChatAgentWeb.ChannelLive do
 
             <div class={["channel-body", "is-#{channel}"]}>
               <ol :if={@messages[channel] != []} class="message-list">
-                <li :for={message <- @messages[channel]} class="message">
+                <li
+                  :for={message <- @messages[channel]}
+                  class={["message", "is-#{message.direction}"]}
+                >
                   <div class="message-bubble">
                     <p class="message-ids">
                       <span :for={{names, value} <- merge_repeats(message.identifiers)}>
                         <span class="message-id-name">{Enum.join(names, " · ")}</span>
                         <span class="message-id-value" title={value}>{value}</span>
+                      </span>
+                      <span :if={message.direction == :outbound} class="message-manual">
+                        sent from this dashboard
                       </span>
                     </p>
                     <p class="message-text">{message.text}</p>
@@ -183,7 +196,7 @@ defmodule ChatAgentWeb.ChannelLive do
                 />
 
                 <p class="message-form-to">
-                  <%= if replying_to = List.first(@messages[channel]) do %>
+                  <%= if replying_to = newest_inbound(@messages[channel]) do %>
                     <span class="message-form-to-label">Replying to</span>
                     <span class="message-id-name">{conversation_field(replying_to)}</span>
                     <span class="message-id-value">{replying_to.conversation}</span>
@@ -203,12 +216,12 @@ defmodule ChatAgentWeb.ChannelLive do
                     aria-label={"Reply on #{channel}"}
                     autocomplete="off"
                     id={"send-#{channel}-body"}
-                    disabled={@messages[channel] == []}
+                    disabled={newest_inbound(@messages[channel]) == nil}
                   />
                   <button
                     type="submit"
                     class="message-send"
-                    disabled={@messages[channel] == []}
+                    disabled={newest_inbound(@messages[channel]) == nil}
                     phx-disable-with="Sending"
                   >
                     Send

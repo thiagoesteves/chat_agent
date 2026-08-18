@@ -603,13 +603,14 @@ main:has(.page-wide) {
 /* Messages ---------------------------------------------------------------- */
 
 /* Each channel gets the chat colours of the app it speaks to, so a card is
- * recognisable at a glance. Only inbound messages exist here, so every bubble
- * is styled as an incoming one.
+ * recognisable at a glance, incoming and outgoing bubbles included.
  */
 .channel-body.is-whatsapp {
   --chat-bg: #efeae2;
   --bubble: #ffffff;
   --bubble-text: #111b21;
+  --bubble-out: #d9fdd3;
+  --bubble-out-text: #111b21;
   --bubble-meta: #667781;
   --bubble-sender: #027eb5;
   --send: #25d366;
@@ -620,6 +621,8 @@ main:has(.page-wide) {
   --chat-bg: #dfe9f2;
   --bubble: #ffffff;
   --bubble-text: #0f1419;
+  --bubble-out: #effdde;
+  --bubble-out-text: #0f1419;
   --bubble-meta: #707579;
   --bubble-sender: #3390ec;
   --send: #3390ec;
@@ -630,6 +633,8 @@ main:has(.page-wide) {
   --chat-bg: var(--surface);
   --bubble: var(--surface-sunken);
   --bubble-text: var(--text);
+  --bubble-out: var(--surface-sunken);
+  --bubble-out-text: var(--text);
   --bubble-meta: var(--text-muted);
   --bubble-sender: var(--accent);
   --send: var(--accent);
@@ -651,6 +656,8 @@ main:has(.page-wide) {
     --chat-bg: #0b141a;
     --bubble: #202c33;
     --bubble-text: #e9edef;
+    --bubble-out: #005c4b;
+    --bubble-out-text: #e9edef;
     --bubble-meta: #8696a0;
     --bubble-sender: #53bdeb;
   }
@@ -661,6 +668,8 @@ main:has(.page-wide) {
     --chat-bg: #0e1621;
     --bubble: #182533;
     --bubble-text: #e9edef;
+    --bubble-out: #2b5278;
+    --bubble-out-text: #e9edef;
     --bubble-meta: #7d8b99;
     --bubble-sender: #6ab3f3;
   }
@@ -672,6 +681,8 @@ html[data-theme="dark"] .channel-body.is-whatsapp {
   --chat-bg: #0b141a;
   --bubble: #202c33;
   --bubble-text: #e9edef;
+  --bubble-out: #005c4b;
+  --bubble-out-text: #e9edef;
   --bubble-meta: #8696a0;
   --bubble-sender: #53bdeb;
 }
@@ -682,6 +693,8 @@ html[data-theme="dark"] .channel-body.is-telegram {
   --chat-bg: #0e1621;
   --bubble: #182533;
   --bubble-text: #e9edef;
+  --bubble-out: #2b5278;
+  --bubble-out-text: #e9edef;
   --bubble-meta: #7d8b99;
   --bubble-sender: #6ab3f3;
 }
@@ -713,6 +726,11 @@ html[data-theme="dark"] .channel-body.is-telegram {
   display: flex;
 }
 
+/* A reply sits on the right, the side a chat client puts your own messages on. */
+.message.is-outbound {
+  justify-content: flex-end;
+}
+
 .message-bubble {
   position: relative;
   max-width: min(85%, 44rem);
@@ -722,6 +740,25 @@ html[data-theme="dark"] .channel-body.is-telegram {
   background: var(--bubble);
   color: var(--bubble-text);
   box-shadow: 0 1px 0.5px rgb(0 0 0 / 0.13);
+}
+
+.message.is-outbound .message-bubble {
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.125rem;
+  background: var(--bubble-out);
+  color: var(--bubble-out-text);
+}
+
+.message-manual {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.3125rem;
+  border-radius: 0.25rem;
+  background: rgb(0 0 0 / 0.07);
+  color: var(--bubble-meta);
+  font-size: 0.625rem;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 .message-ids {
