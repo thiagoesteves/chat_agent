@@ -1,5 +1,8 @@
 import Config
 
+config :chat_agent,
+  healthcheck_logging: System.get_env("HEALTHCHECK_LOGGING") == "true"
+
 if whatsapp_verify_token = System.get_env("WHATSAPP_VERIFY_TOKEN") do
   config :chat_agent, whatsapp_verify_token: whatsapp_verify_token
 end

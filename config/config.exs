@@ -8,7 +8,10 @@
 import Config
 
 config :chat_agent,
-  generators: [timestamp_type: :utc_datetime]
+  generators: [timestamp_type: :utc_datetime],
+  # Health probes run continuously, so `/health` requests are not logged by
+  # default. Set HEALTHCHECK_LOGGING=true to see them while debugging a probe.
+  healthcheck_logging: false
 
 # Maps each chat channel to the module that speaks it, in both directions.
 # Every module implements `ChatAgent.Channel.Adapter`.

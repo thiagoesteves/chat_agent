@@ -43,6 +43,7 @@ Webhook URLs follow one shape, `/<channel>/webhook`, with a router scope per cha
 | `/whatsapp/webhook` | POST | WhatsApp inbound messages |
 | `/telegram/webhook` | POST | Telegram inbound updates, guarded by a secret header |
 | `/channels` | GET | LiveView dashboard of every configured channel |
+| `/health` | GET | Liveness probe, `{"status": "ok", "timestamp": ...}` |
 
 There is one controller per channel, and one router scope per channel.
 The channel is fixed by the route rather than read out of the body, which matters for more
@@ -56,7 +57,14 @@ Everything service specific lives in the channel module behind the behaviour, an
 controller only turns its results into responses.
 
 Runtime configuration comes from environment variables read in `config/runtime.exs`:
-`WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`.
+`WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `HEALTHCHECK_LOGGING`.
+
+### Request logging
+
+`Plug.Telemetry` in the endpoint decides its level through `ChatAgentWeb.Logger.log/1`, so logging is a per-route decision rather than a global level.
+`/health` logs nothing, because a probe running every few seconds would bury the requests worth reading, and `HEALTHCHECK_LOGGING=true` turns it back on when a probe is failing and you need to see it arrive.
+Every other route logs at `:info`.
+Route-specific logging rules belong in that module, not in a plug bolted onto a pipeline.
 
 ---
 
