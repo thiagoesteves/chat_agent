@@ -76,6 +76,17 @@ defmodule ChatAgent.Channel.Adapter do
               :ok | {:ok, ChatAgent.Channel.Message.t()} | {:error, term()}
 
   @doc """
+  Describe the identifiers this channel reports, and where they are documented.
+
+  Used by the dashboard to explain a channel's vocabulary without the web layer
+  needing to know anything about the service.
+  """
+  @callback reference() :: %{
+              url: String.t(),
+              fields: [{name :: String.t(), meaning :: String.t()}]
+            }
+
+  @doc """
   Authenticate an inbound webhook request.
 
   Each service proves itself differently, so the check belongs with the channel

@@ -15,10 +15,20 @@ defmodule ChatAgent.Channel.WhatsappTest do
       assert {:ok, %Message{} = parsed} = Whatsapp.handle_message(message)
       assert parsed.id == "msg_123"
       assert parsed.sender == "1234567890"
+      # One to one only, so the reply address is the sender.
+      assert parsed.conversation == "1234567890"
+      assert parsed.identifiers == [{"from", "1234567890"}, {"id", "msg_123"}]
       assert parsed.text == "Hello"
       assert %DateTime{} = parsed.received_at
       # The facade stamps the channel when it broadcasts.
       assert parsed.channel == nil
+    end
+
+    test "leaves out an identifier the payload had no value for" do
+      message = %{"from" => "1234567890", "text" => %{"body" => "Hello"}}
+
+      assert {:ok, %Message{} = parsed} = Whatsapp.handle_message(message)
+      assert parsed.identifiers == [{"from", "1234567890"}]
     end
 
     test "processes an unknown event" do
@@ -62,6 +72,15 @@ defmodule ChatAgent.Channel.WhatsappTest do
 
       assert {:error, %Req.TransportError{reason: :econnrefused}} =
                Whatsapp.send_message("1234567890", "Hello")
+    end
+  end
+
+  describe "reference/0" do
+    test "names the identifiers and where they are documented" do
+      reference = Whatsapp.reference()
+
+      assert reference.url =~ "developers.facebook.com"
+      assert Enum.any?(reference.fields, &match?({"from", _}, &1))
     end
   end
 

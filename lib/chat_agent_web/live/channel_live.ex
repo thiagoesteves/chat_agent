@@ -32,6 +32,12 @@ defmodule ChatAgentWeb.ChannelLive do
      socket
      |> assign(:page_title, "Channels")
      |> assign(:channels, channels)
+     |> assign(
+       :references,
+       Map.new(channels, fn {channel, module} ->
+         {channel, module.reference()}
+       end)
+     )
      |> assign(:subscribed, subscribed)
      |> assign(:messages, Map.new(channels, fn {channel, _module} -> {channel, []} end))}
   end
@@ -64,9 +70,18 @@ defmodule ChatAgentWeb.ChannelLive do
                 <span class={["channel-avatar", "is-#{channel}"]}>
                   <.channel_icon channel={channel} />
                 </span>
-                <div>
-                  <h2>{channel}</h2>
-                  <code>{inspect(module)}</code>
+                <div class="channel-names">
+                  <div class="channel-title">
+                    <h2>{channel}</h2>
+                    <.channel_reference
+                      channel={channel}
+                      module={module}
+                      reference={@references[channel]}
+                    />
+                  </div>
+                  <div class="channel-fields">
+                    <code :for={{name, _meaning} <- @references[channel].fields}>{name}</code>
+                  </div>
                 </div>
               </div>
               <div class="channel-meta">
@@ -84,7 +99,12 @@ defmodule ChatAgentWeb.ChannelLive do
               <ol :if={@messages[channel] != []} class="message-list">
                 <li :for={message <- @messages[channel]} class="message">
                   <div class="message-bubble">
-                    <span class="message-sender">{message.sender}</span>
+                    <p class="message-ids">
+                      <span :for={{names, value} <- merge_repeats(message.identifiers)}>
+                        <span class="message-id-name">{Enum.join(names, " · ")}</span>
+                        <span class="message-id-value" title={value}>{value}</span>
+                      </span>
+                    </p>
                     <p class="message-text">{message.text}</p>
                     <time datetime={DateTime.to_iso8601(message.received_at)}>
                       {Calendar.strftime(message.received_at, "%H:%M")}
@@ -101,6 +121,52 @@ defmodule ChatAgentWeb.ChannelLive do
         </div>
       </div>
     </Layouts.app>
+    """
+  end
+
+  # Several identifiers can legitimately carry the same value: a Telegram
+  # private chat reports the user's own id as both chat.id and from.id. Naming
+  # them together beats printing the number twice, and still says that both
+  # fields arrived, which dropping one of them would not.
+  defp merge_repeats(identifiers) do
+    Enum.reduce(identifiers, [], &merge_identifier/2)
+  end
+
+  defp merge_identifier({name, value}, merged) do
+    case Enum.find_index(merged, fn {_names, seen} -> seen == value end) do
+      nil -> merged ++ [{[name], value}]
+      index -> List.update_at(merged, index, fn {names, seen} -> {names ++ [name], seen} end)
+    end
+  end
+
+  attr :channel, :atom, required: true
+  attr :module, :atom, required: true
+  attr :reference, :map, required: true
+
+  defp channel_reference(assigns) do
+    ~H"""
+    <details class="channel-ref" id={"reference-#{@channel}"}>
+      <summary title={"What #{@channel} reports"}>
+        <span aria-hidden="true">?</span>
+        <span class="sr-only">What {@channel} reports</span>
+      </summary>
+
+      <div class="channel-ref-panel">
+        <dl>
+          <div :for={{name, meaning} <- @reference.fields}>
+            <dt><code>{name}</code></dt>
+            <dd>{meaning}</dd>
+          </div>
+        </dl>
+
+        <footer>
+          <code>{inspect(@module)}</code>
+          <a href={@reference.url} target="_blank" rel="noopener noreferrer">
+            API reference <span aria-hidden="true">&#8599;</span>
+          </a>
+        </footer>
+      </div>
+    </details>
     """
   end
 
