@@ -74,6 +74,29 @@ defmodule ChatAgentWeb.ChannelLiveTest do
     assert card =~ "42"
   end
 
+  test "names identifiers together rather than repeating a shared value", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/channels")
+
+    # A private chat: Telegram reports the user's own id as both chat.id and
+    # from.id, so the number should appear once under both names.
+    :ok =
+      Channel.handle_message(:telegram, %{
+        "update_id" => 119_773_467,
+        "message" => %{
+          "chat" => %{"id" => 8_827_630_462},
+          "from" => %{"id" => 8_827_630_462},
+          "text" => "Hello from a private chat"
+        }
+      })
+
+    card = view |> element("section.channel-card", "telegram") |> render()
+
+    assert card =~ "chat.id · from.id"
+    assert card =~ "8827630462"
+    assert card =~ "update_id"
+    assert card =~ "119773467"
+  end
+
   test "links each channel to its API reference", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/channels")
 

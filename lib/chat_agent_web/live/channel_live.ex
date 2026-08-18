@@ -100,8 +100,8 @@ defmodule ChatAgentWeb.ChannelLive do
                 <li :for={message <- @messages[channel]} class="message">
                   <div class="message-bubble">
                     <p class="message-ids">
-                      <span :for={{name, value} <- message.identifiers}>
-                        <span class="message-id-name">{name}</span>
+                      <span :for={{names, value} <- merge_repeats(message.identifiers)}>
+                        <span class="message-id-name">{Enum.join(names, " · ")}</span>
                         <span class="message-id-value" title={value}>{value}</span>
                       </span>
                     </p>
@@ -122,6 +122,21 @@ defmodule ChatAgentWeb.ChannelLive do
       </div>
     </Layouts.app>
     """
+  end
+
+  # Several identifiers can legitimately carry the same value: a Telegram
+  # private chat reports the user's own id as both chat.id and from.id. Naming
+  # them together beats printing the number twice, and still says that both
+  # fields arrived, which dropping one of them would not.
+  defp merge_repeats(identifiers) do
+    Enum.reduce(identifiers, [], &merge_identifier/2)
+  end
+
+  defp merge_identifier({name, value}, merged) do
+    case Enum.find_index(merged, fn {_names, seen} -> seen == value end) do
+      nil -> merged ++ [{[name], value}]
+      index -> List.update_at(merged, index, fn {names, seen} -> {names ++ [name], seen} end)
+    end
   end
 
   attr :channel, :atom, required: true
