@@ -39,6 +39,36 @@ defmodule ChatAgent.Channel.Whatsapp do
   end
 
   @impl true
+  def authenticate(_conn) do
+    # The Cloud API signs the raw body with X-Hub-Signature-256. Verifying it
+    # needs the unparsed body, which this endpoint does not retain yet, so
+    # inbound requests are currently accepted on the strength of the URL alone.
+    :ok
+  end
+
+  @impl true
+  def inbound_messages(%{"object" => "whatsapp_business_account", "entry" => entries}) do
+    {:ok, Enum.flat_map(entries, &messages_in_entry/1)}
+  end
+
+  def inbound_messages(_params), do: {:error, :not_found}
+
+  @impl true
+  def verify_subscription(%{
+        "hub.mode" => "subscribe",
+        "hub.verify_token" => token,
+        "hub.challenge" => challenge
+      }) do
+    if token == get_config(:whatsapp_verify_token, nil) do
+      {:ok, challenge}
+    else
+      {:error, :forbidden}
+    end
+  end
+
+  def verify_subscription(_params), do: {:error, :bad_request}
+
+  @impl true
   def send_message(to, body) do
     phone_number_id = get_config!(:whatsapp_phone_number_id)
     access_token = get_config!(:whatsapp_access_token)
@@ -72,6 +102,18 @@ defmodule ChatAgent.Channel.Whatsapp do
   ### ==========================================================================
   ### Private functions
   ### ==========================================================================
+
+  # A webhook batches changes behind an entry/change envelope, and only a
+  # change carrying `messages` holds anything inbound. Statuses and anything
+  # unrecognised are ignored rather than raising, since the service retries a
+  # failed webhook response.
+  defp messages_in_entry(%{"changes" => changes}),
+    do: Enum.flat_map(changes, &messages_in_change/1)
+
+  defp messages_in_entry(_entry), do: []
+
+  defp messages_in_change(%{"value" => %{"messages" => messages}}), do: messages
+  defp messages_in_change(_change), do: []
 
   # The Cloud API signals failure with the HTTP status and describes it in an
   # `error` object, so the status is what decides the outcome here.

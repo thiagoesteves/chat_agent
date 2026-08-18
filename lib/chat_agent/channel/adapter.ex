@@ -76,6 +76,34 @@ defmodule ChatAgent.Channel.Adapter do
               :ok | {:ok, ChatAgent.Channel.Message.t()} | {:error, term()}
 
   @doc """
+  Authenticate an inbound webhook request.
+
+  Each service proves itself differently, so the check belongs with the channel
+  rather than in a shared plug: one signs the body, another sends a shared
+  secret in a header.
+  """
+  @callback authenticate(conn :: Plug.Conn.t()) :: :ok | {:error, :forbidden}
+
+  @doc """
+  Pull the individual payloads out of a webhook body.
+
+  Services wrap messages differently, one batching many behind an envelope and
+  another posting a single update, so unwrapping belongs with the channel. Each
+  returned payload is passed to `c:handle_message/1`.
+  """
+  @callback inbound_messages(params :: map()) ::
+              {:ok, [map()]} | {:error, :bad_request | :not_found}
+
+  @doc """
+  Answer a subscription handshake.
+
+  A channel whose provider performs no handshake returns `{:error, :not_found}`,
+  which is what the endpoint answers.
+  """
+  @callback verify_subscription(params :: map()) ::
+              {:ok, challenge :: String.t()} | {:error, :forbidden | :bad_request | :not_found}
+
+  @doc """
   Send a plain text message out on the channel.
 
   Called by `ChatAgent.Channel.send_message/3` for the module registered under
