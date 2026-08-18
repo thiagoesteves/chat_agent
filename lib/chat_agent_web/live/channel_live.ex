@@ -80,21 +80,23 @@ defmodule ChatAgentWeb.ChannelLive do
               </div>
             </div>
 
-            <ol :if={@messages[channel] != []} class="message-list">
-              <li :for={message <- @messages[channel]} class="message">
-                <div class="message-head">
-                  <span class="message-sender">{message.sender}</span>
-                  <time datetime={DateTime.to_iso8601(message.received_at)}>
-                    {Calendar.strftime(message.received_at, "%H:%M:%S")}
-                  </time>
-                </div>
-                <p class="message-text">{message.text}</p>
-              </li>
-            </ol>
+            <div class={["channel-body", "is-#{channel}"]}>
+              <ol :if={@messages[channel] != []} class="message-list">
+                <li :for={message <- @messages[channel]} class="message">
+                  <div class="message-bubble">
+                    <span class="message-sender">{message.sender}</span>
+                    <p class="message-text">{message.text}</p>
+                    <time datetime={DateTime.to_iso8601(message.received_at)}>
+                      {Calendar.strftime(message.received_at, "%H:%M")}
+                    </time>
+                  </div>
+                </li>
+              </ol>
 
-            <p :if={@messages[channel] == []} class="channel-empty">
-              Waiting for messages on <code>{Channel.topic(channel)}</code>
-            </p>
+              <p :if={@messages[channel] == []} class="channel-empty">
+                Waiting for messages on <code>{Channel.topic(channel)}</code>
+              </p>
+            </div>
           </section>
         </div>
       </div>

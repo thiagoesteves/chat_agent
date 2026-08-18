@@ -73,8 +73,8 @@ defmodule ChatAgent.ChannelTest do
   describe "list/0" do
     test "returns every configured channel and its module" do
       assert Channel.list() == [
-               whatsapp: ChatAgent.Channel.Whatsapp,
-               telegram: ChatAgent.Channel.Telegram
+               telegram: ChatAgent.Channel.Telegram,
+               whatsapp: ChatAgent.Channel.Whatsapp
              ]
     end
   end
