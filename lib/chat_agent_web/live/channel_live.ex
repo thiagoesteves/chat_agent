@@ -55,6 +55,15 @@ defmodule ChatAgentWeb.ChannelLive do
   end
 
   @impl true
+  def handle_event("compose", %{"send" => %{"channel" => name, "body" => body}}, socket) do
+    # The composer's text is kept here rather than only in the browser, so that
+    # clearing it after a send is a change the server can actually push.
+    case channel_named(socket, name) do
+      nil -> {:noreply, socket}
+      channel -> {:noreply, put_form(socket, channel, body)}
+    end
+  end
+
   def handle_event("send_message", %{"send" => %{"channel" => name, "body" => body}}, socket) do
     # The channel comes from the form, the recipient from the conversation the
     # newest message arrived on: a bot cannot open a conversation on either
@@ -83,7 +92,7 @@ defmodule ChatAgentWeb.ChannelLive do
       :ok ->
         socket
         |> put_flash(:info, "Sent on #{channel} to #{recipient}")
-        |> update(:forms, &Map.put(&1, channel, new_send_form(channel)))
+        |> put_form(channel, "")
 
       {:error, reason} ->
         put_flash(socket, :error, "Could not send on #{channel}: #{inspect(reason)}")
@@ -185,6 +194,7 @@ defmodule ChatAgentWeb.ChannelLive do
 
               <.form
                 for={@forms[channel]}
+                phx-change="compose"
                 phx-submit="send_message"
                 id={"send-form-#{channel}"}
                 class="message-form"
@@ -260,8 +270,12 @@ defmodule ChatAgentWeb.ChannelLive do
     end
   end
 
-  defp new_send_form(channel) do
-    to_form(%{"channel" => to_string(channel), "body" => ""}, as: "send")
+  defp put_form(socket, channel, body) do
+    update(socket, :forms, &Map.put(&1, channel, new_send_form(channel, body)))
+  end
+
+  defp new_send_form(channel, body \\ "") do
+    to_form(%{"channel" => to_string(channel), "body" => body}, as: "send")
   end
 
   attr :channel, :atom, required: true

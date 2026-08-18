@@ -184,9 +184,29 @@ defmodule ChatAgentWeb.ChannelLiveTest do
         Req.Test.json(conn, %{"ok" => true, "result" => %{"message_id" => 1}})
       end)
 
-      view |> form("#send-form-telegram", send: %{body: "On it"}) |> render_submit()
+      form = form(view, "#send-form-telegram", send: %{body: "On it"})
+
+      # Typing first, so the rendered value really holds something to clear.
+      render_change(form)
+      assert view |> element("#send-telegram-body") |> render() =~ ~s(value="On it")
+
+      render_submit(form)
 
       assert view |> element("#send-telegram-body") |> render() =~ ~s(value="")
+      refute view |> element("#send-telegram-body") |> render() =~ ~s(value="On it")
+    end
+
+    test "keeps what is typed when it could not be sent", %{view: view} do
+      Req.Test.stub(ChatAgent.Channel.Telegram, fn conn ->
+        Req.Test.json(conn, %{"ok" => false, "description" => "chat not found"})
+      end)
+
+      form = form(view, "#send-form-telegram", send: %{body: "Worth another try"})
+      render_change(form)
+      render_submit(form)
+
+      # Nothing was delivered, so the text is still there to retry or edit.
+      assert view |> element("#send-telegram-body") |> render() =~ ~s(value="Worth another try")
     end
 
     test "reports a failure the service answered with", %{view: view} do
@@ -214,6 +234,16 @@ defmodule ChatAgentWeb.ChannelLiveTest do
         })
 
       assert html =~ "No conversation on whatsapp to reply to yet"
+    end
+
+    test "ignores typing reported for a channel it does not know", %{view: view} do
+      html =
+        render_change(view, "compose", %{
+          "send" => %{"channel" => "carrier_pigeon", "body" => "Hello"}
+        })
+
+      # Nothing to store it against, so the view is left as it was.
+      refute html =~ "Hello"
     end
 
     test "refuses to send on a channel it does not know", %{view: view} do
