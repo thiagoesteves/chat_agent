@@ -1,6 +1,7 @@
 defmodule ChatAgent.Channel.WhatsappTest do
   use ExUnit.Case, async: true
 
+  alias ChatAgent.Channel.Message
   alias ChatAgent.Channel.Whatsapp
 
   describe "handle_message/1" do
@@ -11,7 +12,13 @@ defmodule ChatAgent.Channel.WhatsappTest do
         "text" => %{"body" => "Hello"}
       }
 
-      assert :ok = Whatsapp.handle_message(message)
+      assert {:ok, %Message{} = parsed} = Whatsapp.handle_message(message)
+      assert parsed.id == "msg_123"
+      assert parsed.sender == "1234567890"
+      assert parsed.text == "Hello"
+      assert %DateTime{} = parsed.received_at
+      # The facade stamps the channel when it broadcasts.
+      assert parsed.channel == nil
     end
 
     test "processes an unknown event" do

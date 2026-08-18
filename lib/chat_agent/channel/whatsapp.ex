@@ -9,6 +9,8 @@ defmodule ChatAgent.Channel.Whatsapp do
 
   @behaviour ChatAgent.Channel.Adapter
 
+  alias ChatAgent.Channel.Message
+
   require Logger
 
   ### ==========================================================================
@@ -24,7 +26,7 @@ defmodule ChatAgent.Channel.Whatsapp do
       message_id: message["id"]
     })
 
-    :ok
+    {:ok, Message.new(id: message["id"], sender: phone, text: body)}
   end
 
   def handle_message(message) do

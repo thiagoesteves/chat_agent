@@ -1,1 +1,263 @@
-/* This file is for your main application CSS */
+/* This file is for your main application CSS.
+ * It is loaded after default.css so these rules win where they overlap.
+ */
+
+.channels {
+  --surface: #ffffff;
+  --surface-sunken: #f6f7f9;
+  --border: #e3e6ea;
+  --text: #16181d;
+  --text-muted: #666f7a;
+  --accent: #4f46e5;
+  --live: #16a34a;
+
+  font-feature-settings: "cv02", "cv03", "cv04";
+  color: var(--text);
+}
+
+@media (prefers-color-scheme: dark) {
+  .channels {
+    --surface: #2e353d;
+    --surface-sunken: #272e35;
+    --border: #3d4650;
+    --text: #e6e9ed;
+    --text-muted: #a2abb5;
+    --accent: #818cf8;
+    --live: #4ade80;
+  }
+}
+
+.channels code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 0.8125em;
+}
+
+/* The stock navbar lays its links out in one row, which overlaps the logo on
+ * narrow screens. Let it wrap instead.
+ */
+@media (max-width: 32rem) {
+  .navbar {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+  }
+
+  .navbar > .flex-1 {
+    flex-basis: 100%;
+  }
+}
+
+/* Wider content column than the layout default, for the card grid. */
+.page-wide {
+  max-width: 64rem;
+}
+
+/* Header ------------------------------------------------------------------ */
+
+.channels-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.channels-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.channels-subtitle {
+  margin: 0.375rem 0 0;
+  max-width: 44rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  text-wrap: pretty;
+  color: var(--text-muted);
+}
+
+.conn-badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.4375rem;
+  padding: 0.3125rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  font-size: 0.75rem;
+  font-weight: 550;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.conn-dot {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.conn-badge.is-live {
+  color: var(--live);
+}
+
+.conn-badge.is-live .conn-dot {
+  opacity: 1;
+  animation: conn-pulse 2s ease-in-out infinite;
+}
+
+@keyframes conn-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conn-badge.is-live .conn-dot { animation: none; }
+}
+
+/* Channel cards ----------------------------------------------------------- */
+
+.channel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.channel-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.channel-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-sunken);
+}
+
+.channel-id {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.channel-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.channel-id h2 {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.channel-id code {
+  display: block;
+  margin-top: 0.125rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.channel-count {
+  flex: none;
+  min-width: 1.5rem;
+  padding: 0.125rem 0.4375rem;
+  border-radius: 999px;
+  background: var(--border);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* Messages ---------------------------------------------------------------- */
+
+.message-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 24rem;
+  overflow-y: auto;
+}
+
+.message {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.message:last-child {
+  border-bottom: 0;
+}
+
+.message-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.1875rem;
+}
+
+.message-sender {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-head time {
+  flex: none;
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.message-text {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.channel-empty {
+  margin: 0;
+  padding: 1.75rem 1rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.channel-empty code {
+  display: inline-block;
+  margin-top: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+}

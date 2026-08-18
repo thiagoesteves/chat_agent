@@ -8,6 +8,8 @@ defmodule ChatAgent.Channel.Telegram do
 
   @behaviour ChatAgent.Channel.Adapter
 
+  alias ChatAgent.Channel.Message
+
   require Logger
 
   ### ==========================================================================
@@ -30,7 +32,7 @@ defmodule ChatAgent.Channel.Telegram do
       update_id: update["update_id"]
     })
 
-    :ok
+    {:ok, Message.new(id: to_string(update["update_id"]), sender: to_string(chat_id), text: text)}
   end
 
   def handle_message(update) do

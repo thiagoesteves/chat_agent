@@ -4,6 +4,7 @@ defmodule ChatAgent.ChannelTest do
   import Mox
 
   alias ChatAgent.Channel
+  alias ChatAgent.Channel.Message
 
   setup :verify_on_exit!
 
@@ -66,6 +67,73 @@ defmodule ChatAgent.ChannelTest do
     test "reports a channel with no module configured" do
       assert {:error, {:unknown_channel, :carrier_pigeon}} =
                Channel.send_message(:carrier_pigeon, "anyone", "Hello")
+    end
+  end
+
+  describe "list/0" do
+    test "returns every configured channel and its module" do
+      assert Channel.list() == [
+               whatsapp: ChatAgent.Channel.Whatsapp,
+               telegram: ChatAgent.Channel.Telegram
+             ]
+    end
+  end
+
+  describe "subscribe/1" do
+    test "delivers messages received on the channel, stamped with it" do
+      assert :ok = Channel.subscribe(:whatsapp)
+
+      assert :ok =
+               Channel.handle_message(:whatsapp, %{
+                 "from" => "1234567890",
+                 "id" => "msg_123",
+                 "text" => %{"body" => "Hello"}
+               })
+
+      assert_receive {:message, %Message{} = message}
+      assert message.channel == :whatsapp
+      assert message.sender == "1234567890"
+      assert message.text == "Hello"
+    end
+
+    test "does not deliver payloads that carry no message" do
+      assert :ok = Channel.subscribe(:whatsapp)
+
+      assert :ok = Channel.handle_message(:whatsapp, %{"statuses" => [%{"id" => "msg_123"}]})
+
+      refute_receive {:message, _message}
+    end
+
+    test "delivers only the subscribed channel" do
+      assert :ok = Channel.subscribe(:whatsapp)
+
+      assert :ok =
+               Channel.handle_message(:telegram, %{
+                 "update_id" => 1,
+                 "message" => %{"chat" => %{"id" => 123_456}, "text" => "Hello"}
+               })
+
+      refute_receive {:message, _message}
+    end
+
+    test "unsubscribe/1 stops delivery" do
+      assert :ok = Channel.subscribe(:whatsapp)
+      assert :ok = Channel.unsubscribe(:whatsapp)
+
+      assert :ok =
+               Channel.handle_message(:whatsapp, %{
+                 "from" => "1234567890",
+                 "text" => %{"body" => "Hello"}
+               })
+
+      refute_receive {:message, _message}
+    end
+  end
+
+  describe "topic/1" do
+    test "names a topic per channel" do
+      assert Channel.topic(:whatsapp) == "channel:whatsapp"
+      assert Channel.topic(:telegram) == "channel:telegram"
     end
   end
 

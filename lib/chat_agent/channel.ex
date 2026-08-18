@@ -22,6 +22,14 @@ defmodule ChatAgent.Channel do
           telegram: ChatAgent.Channel.Telegram
         ]
 
+  ## Subscribing to inbound messages
+
+  Every chat message a channel receives is broadcast to that channel's topic,
+  so a LiveView (or anything else) can follow along:
+
+      ChatAgent.Channel.subscribe(:whatsapp)
+      # => receives {:message, %ChatAgent.Channel.Message{}}
+
   ## Adding a new channel
 
   Implement `ChatAgent.Channel.Adapter` and add the module under a new channel
@@ -30,8 +38,11 @@ defmodule ChatAgent.Channel do
   """
 
   alias ChatAgent.Channel.Adapter
+  alias ChatAgent.Channel.Message
 
   @type channel :: atom()
+
+  @pubsub ChatAgent.PubSub
 
   ### ==========================================================================
   ### Public functions
@@ -54,8 +65,14 @@ defmodule ChatAgent.Channel do
   @spec handle_message(channel :: channel(), payload :: map()) :: :ok | {:error, term()}
   def handle_message(channel, payload) do
     case adapter(channel) do
-      nil -> {:error, {:unknown_channel, channel}}
-      module -> module.handle_message(payload)
+      nil ->
+        {:error, {:unknown_channel, channel}}
+
+      module ->
+        case module.handle_message(payload) do
+          {:ok, %Message{} = message} -> broadcast(channel, message)
+          other -> other
+        end
     end
   end
 
@@ -82,14 +99,48 @@ defmodule ChatAgent.Channel do
     end
   end
 
+  @doc """
+  List every configured channel and the module that speaks it.
+
+  ## Examples
+
+      iex> ChatAgent.Channel.list()
+      [whatsapp: ChatAgent.Channel.Whatsapp, telegram: ChatAgent.Channel.Telegram]
+  """
+  @spec list() :: [{channel(), module()}]
+  def list do
+    :chat_agent
+    |> Application.get_env(__MODULE__, [])
+    |> Keyword.get(:adapters, [])
+  end
+
+  @doc """
+  Subscribe the calling process to every chat message received on `channel`.
+
+  Subscribers receive `{:message, %ChatAgent.Channel.Message{}}`.
+  """
+  @spec subscribe(channel :: channel()) :: :ok | {:error, {:already_registered, pid()}}
+  def subscribe(channel), do: Phoenix.PubSub.subscribe(@pubsub, topic(channel))
+
+  @doc """
+  Stop receiving messages for `channel`.
+  """
+  @spec unsubscribe(channel :: channel()) :: :ok
+  def unsubscribe(channel), do: Phoenix.PubSub.unsubscribe(@pubsub, topic(channel))
+
+  @doc """
+  The PubSub topic carrying `channel`'s inbound messages.
+  """
+  @spec topic(channel :: channel()) :: String.t()
+  def topic(channel), do: "channel:#{channel}"
+
   ### ==========================================================================
   ### Private functions
   ### ==========================================================================
 
-  defp adapter(channel) do
-    :chat_agent
-    |> Application.get_env(__MODULE__, [])
-    |> Keyword.get(:adapters, [])
-    |> Keyword.get(channel)
+  defp broadcast(channel, message) do
+    Phoenix.PubSub.broadcast(@pubsub, topic(channel), {:message, %{message | channel: channel}})
   end
+
+  defp adapter(channel), do: Keyword.get(list(), channel)
 end
