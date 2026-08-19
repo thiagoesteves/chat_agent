@@ -115,6 +115,21 @@ defmodule ChatAgent.Channel.Adapter do
               {:ok, challenge :: String.t()} | {:error, :forbidden | :bad_request | :not_found}
 
   @doc """
+  Point the service's webhook at `url`.
+
+  Called when a public URL becomes available (see `ChatAgent.Tunnel`), which on
+  a development machine is a new URL every time the tunnel is opened. A channel
+  should read what the service currently has registered and answer `{:ok,
+  :unchanged}` when it already matches, so restarting the app is not a write to
+  someone else's API.
+
+  A service whose callback URL cannot be set over its API answers `{:error,
+  :not_supported}`, which is reported once rather than retried.
+  """
+  @callback register_webhook(url :: String.t()) ::
+              {:ok, :registered | :unchanged} | {:error, term()}
+
+  @doc """
   Send a plain text message out on the channel.
 
   Called by `ChatAgent.Channel.send_message/3` for the module registered under

@@ -107,31 +107,92 @@ defmodule ChatAgent.Channel.Telegram do
   end
 
   @impl true
+  def register_webhook(url) do
+    case current_webhook_url() do
+      {:ok, ^url} ->
+        {:ok, :unchanged}
+
+      {:ok, _other} ->
+        set_webhook(url)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @impl true
   def send_message(chat_id, body) do
-    bot_token = get_config!(:telegram_bot_token)
-
-    url = "https://api.telegram.org/bot#{bot_token}/sendMessage"
-
     payload = %{
       chat_id: chat_id,
       text: body
     }
 
-    options = [
-      headers: [content_type: "application/json"],
-      json: payload
-    ]
-
-    req_options = Application.get_env(:chat_agent, :telegram_req_options, [])
-
-    url
-    |> Req.post(Keyword.merge(options, req_options))
+    "sendMessage"
+    |> api_url()
+    |> Req.post(request_options(json: payload))
     |> interpret_response()
   end
 
   ### ==========================================================================
   ### Private functions
   ### ==========================================================================
+
+  # What the Bot API currently calls, which is empty when no webhook is set.
+  defp current_webhook_url do
+    # Registration is retried by the caller with a backoff (see
+    # `ChatAgent.Tunnel.Server`), so Req retrying underneath it only delays
+    # that, and holds up whoever asked in the meantime.
+    "getWebhookInfo"
+    |> api_url()
+    |> Req.get(request_options(retry: false))
+    |> case do
+      {:ok, %Req.Response{body: %{"ok" => true, "result" => result}}} ->
+        {:ok, result["url"] || ""}
+
+      other ->
+        registration_error(other)
+    end
+  end
+
+  # The secret token is sent with the URL, since the Bot API takes both in the
+  # same call. It is not reported back by `getWebhookInfo`, so changing the
+  # secret alone leaves the registered webhook looking unchanged: set it again
+  # by hand after changing `TELEGRAM_WEBHOOK_SECRET`.
+  defp set_webhook(url) do
+    payload =
+      case Application.get_env(:chat_agent, :telegram_webhook_secret) do
+        nil -> %{url: url}
+        secret -> %{url: url, secret_token: secret}
+      end
+
+    Logger.info(%{what: "telegram_webhook_registering", url: url})
+
+    "setWebhook"
+    |> api_url()
+    |> Req.post(request_options(json: payload, retry: false))
+    |> case do
+      {:ok, %Req.Response{body: %{"ok" => true}}} -> {:ok, :registered}
+      other -> registration_error(other)
+    end
+  end
+
+  # Registration reports its own outcome, so a response that `interpret_response/1`
+  # would call a success is a shape this did not expect rather than one.
+  defp registration_error(response) do
+    case interpret_response(response) do
+      :ok -> {:error, :unexpected_response}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp api_url(method),
+    do: "https://api.telegram.org/bot#{get_config!(:telegram_bot_token)}/#{method}"
+
+  defp request_options(options) do
+    options
+    |> Keyword.put_new(:headers, content_type: "application/json")
+    |> Keyword.merge(Application.get_env(:chat_agent, :telegram_req_options, []))
+  end
 
   # The Bot API answers 200 with `"ok" => false` for logical failures, so the
   # body decides the outcome rather than the status alone.

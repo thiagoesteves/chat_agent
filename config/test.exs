@@ -21,6 +21,8 @@ config :phoenix_live_view,
 config :phoenix,
   sort_verified_routes_query_params: true
 
+config :chat_agent, ChatAgent.Commander, adapter: ChatAgent.CommanderMock
+
 config :chat_agent,
   whatsapp_verify_token: "test_verify_token",
   whatsapp_access_token: "test_access_token",

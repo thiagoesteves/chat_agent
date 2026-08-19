@@ -26,6 +26,36 @@ if telegram_webhook_secret = System.get_env("TELEGRAM_WEBHOOK_SECRET") do
   config :chat_agent, telegram_webhook_secret: telegram_webhook_secret
 end
 
+# Public ingress. Set TUNNEL_PROVIDER=ngrok on a development machine to open a
+# public URL for the chat services to call back on, which is what removes the
+# need for a DNS name there. A deployment that has one sets PUBLIC_URL instead,
+# or nothing at all: the production block below fills in its own host.
+# Each key is set only when its variable is there, so this does not overwrite
+# what config/<env>.override.exs configured with a nil.
+tunnel_provider =
+  case System.get_env("TUNNEL_PROVIDER") do
+    "ngrok" -> ChatAgent.Tunnel.Provider.Ngrok
+    _none -> nil
+  end
+
+if tunnel_provider do
+  config :chat_agent, ChatAgent.Tunnel, provider: tunnel_provider
+end
+
+public_url = System.get_env("PUBLIC_URL")
+
+if public_url do
+  config :chat_agent, ChatAgent.Tunnel, url: public_url
+end
+
+if ngrok_authtoken = System.get_env("NGROK_AUTHTOKEN") do
+  config :chat_agent, ChatAgent.Tunnel.Provider.Ngrok, authtoken: ngrok_authtoken
+end
+
+if ngrok_domain = System.get_env("NGROK_DOMAIN") do
+  config :chat_agent, ChatAgent.Tunnel.Provider.Ngrok, domain: ngrok_domain
+end
+
 # config/runtime.exs is executed for all environments, including
 # during releases. It is executed after compilation and before the
 # system starts, so it is typically used to load production configuration
@@ -80,6 +110,12 @@ if config_env() == :prod do
   host = System.get_env("PHX_HOST") || "example.com"
 
   config :chat_agent, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+
+  # Reachable over DNS, so the public URL is the endpoint's own host and no
+  # tunnel is run. PUBLIC_URL, already set above, still wins when there is one.
+  if is_nil(public_url) do
+    config :chat_agent, ChatAgent.Tunnel, url: "https://#{host}"
+  end
 
   config :chat_agent, ChatAgentWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],

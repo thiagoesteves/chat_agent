@@ -84,6 +84,13 @@ defmodule ChatAgent.Channel.WhatsappTest do
     end
   end
 
+  describe "register_webhook/1" do
+    test "reports that the Cloud API takes no callback URL from these credentials" do
+      assert {:error, :not_supported} =
+               Whatsapp.register_webhook("https://example.com/whatsapp/webhook")
+    end
+  end
+
   describe "authenticate/1" do
     test "accepts the request, since the URL is what identifies the channel today" do
       assert :ok = Whatsapp.authenticate(%Plug.Conn{})

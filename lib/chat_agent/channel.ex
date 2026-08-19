@@ -107,6 +107,45 @@ defmodule ChatAgent.Channel do
   end
 
   @doc """
+  Point `channel`'s service at the webhook it should call on `base_url`.
+
+  `base_url` is the public URL of this app, without a path: this builds the
+  channel's own webhook URL from it and hands that to the channel module.
+
+  Returns `{:ok, :registered}` when the service was updated, `{:ok, :unchanged}`
+  when it already pointed there, and an error otherwise.
+
+  ## Examples
+
+      iex> ChatAgent.Channel.register_webhook(:telegram, "https://example.com")
+      {:ok, :registered}
+  """
+  @spec register_webhook(channel :: channel(), base_url :: String.t()) ::
+          {:ok, :registered | :unchanged} | {:error, term()}
+  def register_webhook(channel, base_url) do
+    case adapter(channel) do
+      nil -> {:error, {:unknown_channel, channel}}
+      module -> module.register_webhook(webhook_url(channel, base_url))
+    end
+  end
+
+  @doc """
+  The URL `channel`'s webhook is served on, under `base_url`.
+
+  Webhook routes all follow the one shape declared in `ChatAgentWeb.Router`,
+  which is what lets this be built rather than configured per channel.
+
+  ## Examples
+
+      iex> ChatAgent.Channel.webhook_url(:telegram, "https://example.com/")
+      "https://example.com/telegram/webhook"
+  """
+  @spec webhook_url(channel :: channel(), base_url :: String.t()) :: String.t()
+  def webhook_url(channel, base_url) do
+    "#{String.trim_trailing(base_url, "/")}/#{channel}/webhook"
+  end
+
+  @doc """
   List every configured channel and the module that speaks it.
 
   ## Examples

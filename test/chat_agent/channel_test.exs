@@ -99,6 +99,45 @@ defmodule ChatAgent.ChannelTest do
     end
   end
 
+  describe "register_webhook/2" do
+    test "hands the channel its own webhook URL, built from the public one" do
+      stub_channel()
+
+      expect(ChatAgent.ChannelMock, :register_webhook, fn url ->
+        assert url == "https://a1b2c3.ngrok-free.app/mock/webhook"
+        {:ok, :registered}
+      end)
+
+      assert {:ok, :registered} =
+               Channel.register_webhook(:mock, "https://a1b2c3.ngrok-free.app")
+    end
+
+    test "returns the channel result unchanged" do
+      stub_channel()
+
+      expect(ChatAgent.ChannelMock, :register_webhook, fn _url -> {:error, :not_supported} end)
+
+      assert {:error, :not_supported} = Channel.register_webhook(:mock, "https://example.com")
+    end
+
+    test "reports a channel with no module configured" do
+      assert {:error, {:unknown_channel, :carrier_pigeon}} =
+               Channel.register_webhook(:carrier_pigeon, "https://example.com")
+    end
+  end
+
+  describe "webhook_url/2" do
+    test "follows the route shape every channel webhook is served on" do
+      assert Channel.webhook_url(:telegram, "https://example.com") ==
+               "https://example.com/telegram/webhook"
+    end
+
+    test "does not double the separator when the base URL ends in one" do
+      assert Channel.webhook_url(:whatsapp, "https://example.com/") ==
+               "https://example.com/whatsapp/webhook"
+    end
+  end
+
   describe "list/0" do
     test "returns every configured channel and its module" do
       assert Channel.list() == [

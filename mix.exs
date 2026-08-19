@@ -56,6 +56,10 @@ defmodule ChatAgent.MixProject do
       {:bandit, "~> 1.5"},
       {:req, "~> 0.6.1"},
 
+      # Runs and supervises OS processes (the tunnel agent) from the BEAM, so a
+      # crashed agent is an EXIT message rather than an orphaned process.
+      {:erlexec, "~> 2.2"},
+
       # Asset build. Both install a platform binary on first use and are only
       # needed while developing: a release serves what `assets.deploy` built.
       # Heroicons is the icon source the Tailwind plugin in assets/vendor reads,
@@ -111,6 +115,10 @@ defmodule ChatAgent.MixProject do
         # OTP and test scaffolding. Counting these as covered product code
         # flatters the number for no reason.
         ChatAgent.Application,
+        # The binding to erlexec, one line per call. Exercising it would mean
+        # running real OS processes, which is what the adapter exists to keep
+        # out of the test suite.
+        ChatAgent.Commander.Local,
         ChatAgentWeb.ConnCase,
         # `embed_templates` generates layout and error page functions, and cover
         # does not attribute execution back to them.

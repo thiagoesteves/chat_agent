@@ -111,6 +111,109 @@ defmodule ChatAgent.Channel.TelegramTest do
     end
   end
 
+  describe "register_webhook/1" do
+    test "sets the webhook, with the configured secret, when it points elsewhere" do
+      test_process = self()
+
+      Req.Test.stub(Telegram, fn conn ->
+        case conn.request_path do
+          "/bottest_telegram_bot_token/getWebhookInfo" ->
+            Req.Test.json(conn, %{"ok" => true, "result" => %{"url" => "https://old.example.com"}})
+
+          "/bottest_telegram_bot_token/setWebhook" ->
+            {:ok, body, conn} = Plug.Conn.read_body(conn)
+            send(test_process, {:set_webhook, Jason.decode!(body)})
+            Req.Test.json(conn, %{"ok" => true, "result" => true})
+        end
+      end)
+
+      assert {:ok, :registered} =
+               Telegram.register_webhook("https://a1b2c3.ngrok-free.app/telegram/webhook")
+
+      assert_receive {:set_webhook, payload}
+      assert payload["url"] == "https://a1b2c3.ngrok-free.app/telegram/webhook"
+      assert payload["secret_token"] == "test_telegram_webhook_secret"
+    end
+
+    test "sets no secret token when none is configured" do
+      configured = Application.get_env(:chat_agent, :telegram_webhook_secret)
+      on_exit(fn -> Application.put_env(:chat_agent, :telegram_webhook_secret, configured) end)
+      Application.put_env(:chat_agent, :telegram_webhook_secret, nil)
+
+      test_process = self()
+
+      Req.Test.stub(Telegram, fn conn ->
+        case conn.request_path do
+          "/bottest_telegram_bot_token/getWebhookInfo" ->
+            Req.Test.json(conn, %{"ok" => true, "result" => %{}})
+
+          "/bottest_telegram_bot_token/setWebhook" ->
+            {:ok, body, conn} = Plug.Conn.read_body(conn)
+            send(test_process, {:set_webhook, Jason.decode!(body)})
+            Req.Test.json(conn, %{"ok" => true, "result" => true})
+        end
+      end)
+
+      assert {:ok, :registered} =
+               Telegram.register_webhook("https://example.com/telegram/webhook")
+
+      assert_receive {:set_webhook, payload}
+      refute Map.has_key?(payload, "secret_token")
+    end
+
+    test "leaves a webhook that already points there alone" do
+      Req.Test.stub(Telegram, fn conn ->
+        assert conn.request_path == "/bottest_telegram_bot_token/getWebhookInfo"
+
+        Req.Test.json(conn, %{
+          "ok" => true,
+          "result" => %{"url" => "https://a1b2c3.ngrok-free.app/telegram/webhook"}
+        })
+      end)
+
+      assert {:ok, :unchanged} =
+               Telegram.register_webhook("https://a1b2c3.ngrok-free.app/telegram/webhook")
+    end
+
+    test "reports a failure reading what is registered" do
+      Req.Test.stub(Telegram, fn conn ->
+        Req.Test.json(conn, %{"ok" => false, "description" => "Unauthorized"})
+      end)
+
+      assert {:error, {:telegram_error, "Unauthorized"}} =
+               Telegram.register_webhook("https://example.com/telegram/webhook")
+    end
+
+    test "reports a failure setting the webhook" do
+      Req.Test.stub(Telegram, fn conn ->
+        case conn.request_path do
+          "/bottest_telegram_bot_token/getWebhookInfo" ->
+            Req.Test.json(conn, %{"ok" => true, "result" => %{"url" => ""}})
+
+          "/bottest_telegram_bot_token/setWebhook" ->
+            Req.Test.json(conn, %{"ok" => false, "description" => "bad webhook: HTTPS required"})
+        end
+      end)
+
+      assert {:error, {:telegram_error, "bad webhook: HTTPS required"}} =
+               Telegram.register_webhook("http://example.com/telegram/webhook")
+    end
+
+    test "reports a transport error" do
+      Req.Test.stub(Telegram, fn conn -> Req.Test.transport_error(conn, :econnrefused) end)
+
+      assert {:error, %Req.TransportError{reason: :econnrefused}} =
+               Telegram.register_webhook("https://example.com/telegram/webhook")
+    end
+
+    test "reports an answer it does not recognise" do
+      Req.Test.stub(Telegram, fn conn -> Req.Test.json(conn, %{"ok" => true}) end)
+
+      assert {:error, :unexpected_response} =
+               Telegram.register_webhook("https://example.com/telegram/webhook")
+    end
+  end
+
   describe "authenticate/1" do
     test "accepts a request carrying the configured secret" do
       request = conn(:post, "/telegram/webhook", "")

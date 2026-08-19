@@ -21,6 +21,21 @@ config :chat_agent, ChatAgent.Channel,
     whatsapp: ChatAgent.Channel.Whatsapp
   ]
 
+# Public ingress. Without a provider no tunnel is run and the URL, if any,
+# comes from the `:url` key: that is how a deployment behind DNS runs, and
+# `TUNNEL_PROVIDER=ngrok` in config/runtime.exs is how a development machine
+# gets a public URL without one. See `ChatAgent.Tunnel`.
+config :chat_agent, ChatAgent.Tunnel,
+  provider: nil,
+  url: nil,
+  port: nil,
+  connect_timeout: :timer.seconds(30),
+  max_backoff: :timer.minutes(1)
+
+# Runs the operating system commands a tunnel provider needs. Swapped for a
+# mock in tests, so nothing there reaches the machine.
+config :chat_agent, ChatAgent.Commander, adapter: ChatAgent.Commander.Local
+
 # Configure the endpoint
 config :chat_agent, ChatAgentWeb.Endpoint,
   url: [host: "localhost"],

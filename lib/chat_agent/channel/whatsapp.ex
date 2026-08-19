@@ -92,6 +92,15 @@ defmodule ChatAgent.Channel.Whatsapp do
   def verify_subscription(_params), do: {:error, :bad_request}
 
   @impl true
+  def register_webhook(_url) do
+    # The Cloud API takes no callback URL from the messaging credentials this
+    # app holds: it is set on the app itself, either in the App dashboard or
+    # through the Graph API subscriptions edge, which needs app credentials
+    # rather than a phone number's access token.
+    {:error, :not_supported}
+  end
+
+  @impl true
   def send_message(to, body) do
     phone_number_id = get_config!(:whatsapp_phone_number_id)
     access_token = get_config!(:whatsapp_access_token)
