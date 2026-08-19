@@ -44,6 +44,14 @@ defmodule ChatAgent.Tunnel.Server do
   ### Public functions
   ### ==========================================================================
 
+  @doc """
+  Start the state machine under a supervisor.
+
+  Every option overrides the matching key read from `ChatAgent.Tunnel`'s
+  configuration, which is what lets a test run one without configuring the
+  application: `:provider`, `:port`, `:connect_timeout` and `:max_backoff`, plus
+  a `:name` to register under when it is not the module's own.
+  """
   @spec start_link(options :: keyword()) :: :gen_statem.start_ret()
   def start_link(options) do
     {name, options} = Keyword.pop(options, :name, __MODULE__)
@@ -51,6 +59,12 @@ defmodule ChatAgent.Tunnel.Server do
     :gen_statem.start_link({:local, name}, __MODULE__, options, [])
   end
 
+  @doc """
+  The child specification a supervisor starts this from.
+
+  Written out because `:gen_statem` has no `use` to generate one, and the id is
+  the registered name so two tunnels could run side by side.
+  """
   @spec child_spec(options :: keyword()) :: Supervisor.child_spec()
   def child_spec(options) do
     %{

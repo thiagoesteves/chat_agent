@@ -28,8 +28,10 @@ defmodule ChatAgent.Tunnel do
         # a tunnel to do, so setting this runs no agent even when one is
         # configured.
         url: nil,
-        # The local port to forward to. Defaults to the endpoint's HTTP port.
-        port: 4000,
+        # The local port to forward to. With none set, the port the endpoint
+        # actually bound, which is the only right answer when it was asked to
+        # bind port 0.
+        port: nil,
         # How long to wait for the agent to report its URL before restarting it.
         connect_timeout: :timer.seconds(30),
         # Ceiling for the retry backoff between attempts.
@@ -102,8 +104,9 @@ defmodule ChatAgent.Tunnel do
   Whether a tunnel agent is run at all.
 
   A statically configured URL is already public, so an agent would have
-  nothing to open: the two are alternatives rather than layers, and this is
-  what `ChatAgent.Application` starts the state machine on.
+  nothing to open: the two are alternatives rather than layers. The
+  application's supervision tree starts the state machine on this, and nothing
+  else decides it.
   """
   @spec enabled?() :: boolean()
   def enabled? do

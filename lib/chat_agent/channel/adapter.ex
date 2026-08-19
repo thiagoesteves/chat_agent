@@ -12,6 +12,9 @@ defmodule ChatAgent.Channel.Adapter do
       an actual chat message it returns it as a `ChatAgent.Channel.Message`,
       which `ChatAgent.Channel` broadcasts to subscribers.
     * `c:send_message/2` sends a text message back out on the same channel.
+    * `c:register_webhook/1` points the service at the URL its webhook is
+      served on, which is what makes a channel work behind a URL that changes
+      (see `ChatAgent.Tunnel`).
 
   ## Implementing a new channel
 
@@ -45,12 +48,23 @@ defmodule ChatAgent.Channel.Adapter do
         def send_message(recipient, body) do
           # post to the channel API and return :ok or {:error, reason}
         end
+
+        @impl true
+        def register_webhook(url) do
+          # read what the service has registered, and only write when it
+          # differs, or report {:error, :not_supported} when it has no API
+          # for this at all
+        end
       end
 
   `handle_message/1` should accept any payload shape the channel can deliver.
   Webhooks send more than chat messages (delivery receipts, edits, reactions),
   and a function clause error there turns into a failed webhook response and a
   channel-side retry.
+
+  `register_webhook/1` is asked again whenever a new public URL appears, so it
+  should read before it writes: a service that already points at the URL wants
+  `{:ok, :unchanged}`, not another write.
 
   `send_message/2` should decide success by whatever its own API treats as
   success. That differs per service: an HTTP status for one, a field in a 200
