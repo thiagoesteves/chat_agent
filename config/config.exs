@@ -7,11 +7,30 @@
 # General application configuration
 import Config
 
+config :chat_agent, :scopes,
+  user: [
+    default: true,
+    module: ChatAgent.Accounts.Scope,
+    assign_key: :current_scope,
+    access_path: [:user, :id],
+    schema_key: :user_id,
+    schema_type: :id,
+    schema_table: :users,
+    test_data_fixture: ChatAgent.AccountsFixtures,
+    test_setup_helper: :register_and_log_in_user
+  ]
+
 config :chat_agent,
   generators: [timestamp_type: :utc_datetime],
   # Health probes run continuously, so `/health` requests are not logged by
   # default. Set HEALTHCHECK_LOGGING=true to see them while debugging a probe.
-  healthcheck_logging: false
+  healthcheck_logging: false,
+  ecto_repos: [ChatAgent.Repo]
+
+config :chat_agent, ChatAgent.Mailer, adapter: Swoosh.Adapters.Local
+
+# Finch is already pulled in by Req, so use it as Swoosh's API client.
+config :swoosh, :api_client, Swoosh.ApiClient.Finch
 
 # Maps each chat channel to the module that speaks it, in both directions.
 # Every module implements `ChatAgent.Channel.Adapter`.
@@ -114,3 +133,6 @@ override_file = "#{config_env()}.override.exs"
 if File.exists?("config/#{override_file}") or File.exists?("../../config/#{override_file}") do
   import_config override_file
 end
+
+# Whether the default administrator account should be created by the seed file.
+config :chat_agent, :repo_seeds, default_user: [username: "admin", password: "admin"]

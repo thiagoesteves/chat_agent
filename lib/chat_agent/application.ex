@@ -14,6 +14,7 @@ defmodule ChatAgent.Application do
         ChatAgentWeb.Telemetry,
         {DNSCluster, query: Application.get_env(:chat_agent, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: ChatAgent.PubSub},
+        ChatAgent.Repo,
         # Start to serve requests, typically the last entry
         ChatAgentWeb.Endpoint
       ] ++ assistant() ++ tunnel()

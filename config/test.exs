@@ -1,5 +1,8 @@
 import Config
 
+# Only in tests, remove the complexity from the password hashing algorithm
+config :pbkdf2_elixir, :rounds, 1
+
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
 config :chat_agent, ChatAgentWeb.Endpoint,
@@ -42,3 +45,7 @@ config :chat_agent, ChatAgent.Channel.Telegram,
   bot_token: "test_telegram_bot_token",
   webhook_secret: "test_telegram_webhook_secret",
   req_options: [plug: {Req.Test, ChatAgent.Channel.Telegram}]
+
+config :chat_agent, ChatAgent.Repo,
+  database: "priv/repo/test.sqlite3",
+  pool: Ecto.Adapters.SQL.Sandbox

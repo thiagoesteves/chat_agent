@@ -108,6 +108,10 @@ if System.get_env("PHX_SERVER") do
   config :chat_agent, ChatAgentWeb.Endpoint, server: true
 end
 
+config :chat_agent, ChatAgent.Repo,
+  database: System.get_env("DATABASE_PATH") || "priv/repo/chat_agent.db",
+  pool_size: 1
+
 config :chat_agent, ChatAgentWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 

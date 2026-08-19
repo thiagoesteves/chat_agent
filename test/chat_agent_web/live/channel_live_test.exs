@@ -1,6 +1,8 @@
 defmodule ChatAgentWeb.ChannelLiveTest do
   use ChatAgentWeb.ConnCase, async: true
 
+  setup :register_and_log_in_user
+
   alias ChatAgent.Channel
 
   test "lists every configured channel", %{conn: conn} do
@@ -228,10 +230,10 @@ defmodule ChatAgentWeb.ChannelLiveTest do
       assert html =~ "No conversation on whatsapp to reply to yet"
     end
 
-    test "survives a change event a disabled composer left the body out of" do
+    test "survives a change event a disabled composer left the body out of", %{conn: conn} do
       # What a browser submits for a channel with no conversation yet: the
       # composer is disabled, so only the hidden channel field is serialised.
-      {:ok, view, _html} = live(build_conn(), ~p"/channels")
+      {:ok, view, _html} = live(conn, ~p"/channels")
 
       html = render_change(view, "compose", %{"send" => %{"channel" => "whatsapp"}})
 

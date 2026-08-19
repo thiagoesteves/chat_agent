@@ -2,6 +2,8 @@ defmodule ChatAgentWeb.ChannelLiveTunnelTest do
   # Not async: every test here configures the tunnel, which is global.
   use ChatAgentWeb.ConnCase, async: false
 
+  setup :register_and_log_in_user
+
   alias ChatAgent.Tunnel
   alias ChatAgent.Tunnel.Status
 

@@ -60,6 +60,13 @@ defmodule ChatAgent.MixProject do
       # crashed agent is an EXIT message rather than an orphaned process.
       {:erlexec, "~> 2.2"},
 
+      # Database and authentication support.
+      {:phoenix_ecto, "~> 4.4"},
+      {:ecto_sql, "~> 3.10"},
+      {:ecto_sqlite3, "~> 0.17"},
+      {:pbkdf2_elixir, "~> 2.3"},
+      {:swoosh, "~> 1.14"},
+
       # Asset build. Both install a platform binary on first use and are only
       # needed while developing: a release serves what `assets.deploy` built.
       # Heroicons is the icon source the Tailwind plugin in assets/vendor reads,
@@ -151,6 +158,9 @@ defmodule ChatAgent.MixProject do
         "phx.digest"
       ],
       precommit: [
+        "ecto.drop",
+        "ecto.create",
+        "ecto.migrate",
         "compile --warnings-as-errors",
         "deps.unlock --unused",
         "format",
