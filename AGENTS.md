@@ -315,8 +315,12 @@ Route-specific logging rules belong in that module, not in a plug bolted onto a 
 # Install deps and compile (warnings as errors)
 mix do deps.get + compile --warnings-as-errors
 
-# Everything a fresh clone needs: deps, asset tool binaries, first asset build
+# Everything a fresh clone needs: deps, database, asset tool binaries, assets
 mix setup
+
+# Create, migrate and seed the database, or start it over
+mix ecto.setup
+mix ecto.reset
 
 # Build assets once, without starting the server
 mix assets.build
@@ -363,6 +367,21 @@ Sobelow must run from the project root.
 Do not pass `-r lib/chat_agent_web`, which is umbrella-app usage and makes Sobelow report "This does not appear to be a Phoenix application".
 
 ---
+
+### Migrating a release
+
+A release ships compiled code and no build tool, so `mix ecto.migrate` is not available where it matters most.
+`ChatAgent.Release` is the same work, callable from the release's own binary:
+
+```bash
+bin/chat_agent eval "ChatAgent.Release.migrate()"
+bin/chat_agent eval "ChatAgent.Release.rollback(ChatAgent.Repo, 20260819152520)"
+```
+
+Run it **before** starting the application rather than from inside it: a node that migrates on boot races every other node doing the same.
+
+`migrate/0` makes the directory the database file lives in first, which `prepare_storage/0` also does on its own.
+SQLite is a file, and opening one creates it, but only inside a directory that exists: a release pointed at a fresh volume through `DATABASE_PATH` has a path and no directory, and would otherwise fail on the migration rather than on the thing that is actually missing.
 
 ## Safety and Permissions
 
