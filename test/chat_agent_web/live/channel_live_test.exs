@@ -236,6 +236,23 @@ defmodule ChatAgentWeb.ChannelLiveTest do
       assert html =~ "No conversation on whatsapp to reply to yet"
     end
 
+    test "survives a change event a disabled composer left the body out of" do
+      # What a browser submits for a channel with no conversation yet: the
+      # composer is disabled, so only the hidden channel field is serialised.
+      {:ok, view, _html} = live(build_conn(), ~p"/channels")
+
+      html = render_change(view, "compose", %{"send" => %{"channel" => "whatsapp"}})
+
+      assert html =~ "Nothing to reply to yet"
+      assert render(view) =~ "send-form-whatsapp"
+    end
+
+    test "refuses to send a body that never arrived", %{view: view} do
+      html = render_submit(view, "send_message", %{"send" => %{"channel" => "telegram"}})
+
+      assert html =~ "Nothing to send on telegram"
+    end
+
     test "ignores typing reported for a channel it does not know", %{view: view} do
       html =
         render_change(view, "compose", %{

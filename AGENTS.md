@@ -5,6 +5,7 @@
 ChatAgent is a Phoenix application that receives chat messages from external messaging services over webhooks and sends replies back to them.
 It currently speaks WhatsApp (Cloud API) and Telegram (Bot API).
 There is no database: inbound messages are handled in process and broadcast over PubSub, and a LiveView dashboard shows them arriving.
+Reaching those webhooks from the internet is `ChatAgent.Tunnel`'s job: in a deployment that is a DNS name, and on a development machine it is a tunnel agent (ngrok) run as an OS process.
 
 Elixir requirement is `~> 1.19`.
 The exact toolchain is pinned in `.tool-versions` (Erlang 28.5.0.4, Elixir 1.19.5-otp-28).
@@ -22,6 +23,17 @@ lib/
       message.ex            # normalised inbound message struct
       whatsapp.ex           # WhatsApp channel, both directions
       telegram.ex           # Telegram channel, both directions
+    commander.ex            # ChatAgent.Commander, the OS facade
+    commander/
+      adapter.ex            # behaviour the OS binding implements
+      local.ex              # erlexec binding, the only implementation
+    tunnel.ex               # ChatAgent.Tunnel, the public URL facade
+    tunnel/
+      server.ex             # :gen_statem keeping a public URL open
+      status.ex             # what the tunnel is doing, broadcast on change
+      provider/
+        adapter.ex          # behaviour every tunnel agent implements
+        ngrok.ex            # ngrok agent, run and read over stdout
     application.ex
   chat_agent_web/
     controllers/            # webhook endpoints, one controller per service
@@ -63,7 +75,64 @@ Everything service specific lives in the channel module behind the behaviour, an
 controller only turns its results into responses.
 
 Runtime configuration comes from environment variables read in `config/runtime.exs`:
-`WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `HEALTHCHECK_LOGGING`.
+`WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `HEALTHCHECK_LOGGING`, `TUNNEL_PROVIDER`, `PUBLIC_URL`, `NGROK_AUTHTOKEN`, `NGROK_DOMAIN`.
+
+### The public URL
+
+A chat service delivers messages by calling a URL, so this app has to be reachable from the internet before any channel works.
+`ChatAgent.Tunnel` answers that one question, `url/0`, whichever way the answer is arrived at.
+
+| Where it runs | Where the URL comes from |
+|---|---|
+| Deployment behind DNS | `PUBLIC_URL`, or the endpoint's own `PHX_HOST` in production |
+| Development machine | A tunnel agent, started when `TUNNEL_PROVIDER=ngrok` is set |
+
+Nothing else in the app knows which of the two it is running behind.
+They are alternatives rather than layers: a configured URL is already public, so `ChatAgent.Tunnel.enabled?/0` is false whenever one is set and no agent is started, which is what keeps the URL the app reports and the URL its webhooks point at the same one.
+
+```bash
+# Open a public URL and point every channel's webhook at it
+TUNNEL_PROVIDER=ngrok mix phx.server
+```
+
+Development runs the same code as anywhere else, and nothing is dev only: what differs is only which of the two configuration keys is filled in.
+Out of the box neither is, so `mix phx.server` runs no agent and `ChatAgent.Tunnel.url/0` answers `{:error, :not_configured}`.
+The provider can also be set for good in `config/dev.override.exs`, the gitignored local overrides file, instead of prefixing the variable each time.
+`config/runtime.exs` sets each tunnel key only when its environment variable is present, precisely so it does not overwrite that file with a nil.
+
+Running the agent opens a publicly reachable URL onto the local machine, and registering a webhook writes to the chat service's API, so both are opt in rather than the default.
+
+`ChatAgent.Tunnel.Server` is a `:gen_statem` rather than a `GenServer` with a status field, because opening a tunnel is a sequence where each step can fail:
+
+```
+authenticating -> connecting -> registering -> connected
+       ^-------------------------------------------|
+              (agent exited, or a step failed)
+```
+
+Every failure returns to `:authenticating` after a backoff that grows with the number of consecutive attempts, and every state change is broadcast on the `"tunnel"` topic as a `ChatAgent.Tunnel.Status`.
+
+Each transition is also logged once, as `tunnel_state_changed` with `from`, `to`, `attempt`, `retry_in_ms` and the URL, so a log read top to bottom is the path the machine took.
+A retry reads as `from` and `to` being equal, and starting up reads as `from: :none`.
+Every other line the agent writes is logged at `:debug` as `tunnel_agent_output`, which is what to turn on when the agent itself is the thing misbehaving.
+
+The port it forwards to is not configured twice: with no `:port` set, the state machine asks the endpoint what it actually bound (`ChatAgentWeb.Endpoint.server_info/1`), which is the only answer that is right when the configuration says `port: 0`, and falls back to the configured port when nothing is listening.
+
+The agent runs under `ChatAgent.Commander.run_link/2`, which is erlexec: the OS process is linked to the state machine, so the agent dying arrives as an `{:EXIT, _, _}` message and the state machine dying takes the agent with it.
+That link is why nothing here has a `terminate/3` killing the agent by hand.
+The URL is read out of the agent's stdout, buffered until a whole line is available, and handed to the provider's `parse/1`.
+
+`:registering` is where each channel is told where its webhook now lives, through `c:ChatAgent.Channel.Adapter.register_webhook/1`.
+A channel reads what its service currently has registered first and answers `{:ok, :unchanged}` when it already matches, so restarting the app is not a write to someone else's API.
+A channel whose service takes no callback URL over its API answers `{:error, :not_supported}` and is not asked again, which is what WhatsApp does: the Cloud API sets it on the app itself rather than through the messaging credentials this app holds.
+
+### Running OS commands
+
+Everything that leaves the BEAM for the operating system goes through `ChatAgent.Commander`, which resolves its adapter from configuration on every call.
+`ChatAgent.Commander.Local` is the only implementation and binds straight to erlexec, one line per call, so tests swap the whole thing for `ChatAgent.CommanderMock` and nothing reaches the machine.
+
+erlexec refuses to start when the BEAM runs as root.
+A deployment that does (a container running as root, say) has to configure `config :erlexec, root: true, user: "...", limit_users: ["..."]` for the app to boot at all, which is one more reason a deployment behind DNS runs no tunnel.
 
 ### Request logging
 
@@ -147,14 +216,15 @@ Rules for AI agents about which actions may run without asking and which require
 - Installing or updating packages (changing `mix.exs` deps, `mix deps.get` or `mix deps.update` after dependency changes)
 - `git push`, opening a PR, or any other action that leaves the local machine
 - Deleting files or changing permissions (`rm`, `chmod`)
-- Sending real requests to the WhatsApp or Telegram APIs with production credentials
+- Sending real requests to the WhatsApp or Telegram APIs with production credentials, which includes registering a webhook
+- Running a tunnel agent (`TUNNEL_PROVIDER=ngrok mix phx.server`, or `ngrok` directly), since it exposes the local machine publicly
 
 ---
 
 ## Testing
 
 - **Framework:** ExUnit, with `test/support/` compiled only in the test environment
-- **Behaviour mocks:** Mox. `ChatAgent.ChannelMock` is defined in `test/test_helper.exs` against `ChatAgent.Channel.Adapter`, so a callback change breaks the tests at compile time
+- **Behaviour mocks:** Mox. `ChatAgent.ChannelMock`, `ChatAgent.CommanderMock` and `ChatAgent.TunnelProviderMock` are defined in `test/test_helper.exs` against their behaviours, so a callback change breaks the tests at compile time
 - **HTTP stubbing:** `Req.Test`, wired through the `:whatsapp_req_options` and `:telegram_req_options` config keys in `config/test.exs`
 - **Coverage threshold:** **90%**, enforced by `mix test --cover`. The suite currently sits at 100%
 - **Excluded modules:** OTP and test scaffolding, plus modules whose functions are generated by `embed_templates` (see `ignore_modules` in `mix.exs`)
@@ -167,6 +237,9 @@ With `setup :verify_on_exit!` and no expectation declared, any call to the mock 
 That is how "a statuses-only webhook change reaches no channel" and "a request with an invalid secret reaches no channel" are asserted.
 
 A test that overrides application configuration must be `async: false`, since that configuration is global.
+
+`ChatAgent.Tunnel.Server` does its work from its own process, so its test uses `set_mox_global`, and the mocked `run_link` returns a process it spawned with `spawn_link`, which leaves the fake agent linked to the state machine exactly as erlexec would.
+Drive it with the messages it actually receives (`{:stdout, os_pid, chunk}`, killing the linked process) and wait on the mock calls rather than on a broadcast, since a broadcast can be sent before the call the test is verifying.
 
 ### Verify UI work in a browser
 

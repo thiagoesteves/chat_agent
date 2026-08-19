@@ -54,22 +54,27 @@ defmodule ChatAgentWeb.ChannelLive do
      end)}
   end
 
+  # A browser leaves a disabled input out of what it submits, and the composer
+  # is disabled until a channel has a conversation to reply to, so the body is
+  # not a key these can count on being there.
   @impl true
-  def handle_event("compose", %{"send" => %{"channel" => name, "body" => body}}, socket) do
+  def handle_event("compose", %{"send" => %{"channel" => name} = send}, socket) do
     # The composer's text is kept here rather than only in the browser, so that
     # clearing it after a send is a change the server can actually push.
     case channel_named(socket, name) do
       nil -> {:noreply, socket}
-      channel -> {:noreply, put_form(socket, channel, body)}
+      channel -> {:noreply, put_form(socket, channel, body(send))}
     end
   end
 
-  def handle_event("send_message", %{"send" => %{"channel" => name, "body" => body}}, socket) do
+  def handle_event("send_message", %{"send" => %{"channel" => name} = send}, socket) do
     # The channel comes from the form, the recipient from the conversation the
     # newest message arrived on: a bot cannot open a conversation on either
     # service, it can only answer one.
-    {:noreply, send_reply(socket, channel_named(socket, name), String.trim(body))}
+    {:noreply, send_reply(socket, channel_named(socket, name), String.trim(body(send)))}
   end
+
+  defp body(send), do: Map.get(send, "body", "")
 
   defp send_reply(socket, nil, _body), do: put_flash(socket, :error, "Unknown channel")
 
