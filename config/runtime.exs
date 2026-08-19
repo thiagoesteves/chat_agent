@@ -3,27 +3,31 @@ import Config
 config :chat_agent,
   healthcheck_logging: System.get_env("HEALTHCHECK_LOGGING") == "true"
 
+# Each channel's credentials, under that channel's own module. As everywhere
+# else in this file, a key is set only when its variable is there, so nothing
+# here overwrites config/<env>.override.exs with a nil.
 if whatsapp_verify_token = System.get_env("WHATSAPP_VERIFY_TOKEN") do
-  config :chat_agent, whatsapp_verify_token: whatsapp_verify_token
+  config :chat_agent, ChatAgent.Channel.Whatsapp, verify_token: whatsapp_verify_token
 end
 
 if whatsapp_access_token = System.get_env("WHATSAPP_ACCESS_TOKEN") do
-  config :chat_agent, whatsapp_access_token: whatsapp_access_token
+  config :chat_agent, ChatAgent.Channel.Whatsapp, access_token: whatsapp_access_token
 end
 
 if whatsapp_phone_number_id = System.get_env("WHATSAPP_PHONE_NUMBER_ID") do
-  config :chat_agent, whatsapp_phone_number_id: whatsapp_phone_number_id
+  config :chat_agent, ChatAgent.Channel.Whatsapp, phone_number_id: whatsapp_phone_number_id
 end
 
-config :chat_agent,
-  whatsapp_api_version: System.get_env("WHATSAPP_API_VERSION", "v20.0")
+if whatsapp_api_version = System.get_env("WHATSAPP_API_VERSION") do
+  config :chat_agent, ChatAgent.Channel.Whatsapp, api_version: whatsapp_api_version
+end
 
 if telegram_bot_token = System.get_env("TELEGRAM_BOT_TOKEN") do
-  config :chat_agent, telegram_bot_token: telegram_bot_token
+  config :chat_agent, ChatAgent.Channel.Telegram, bot_token: telegram_bot_token
 end
 
 if telegram_webhook_secret = System.get_env("TELEGRAM_WEBHOOK_SECRET") do
-  config :chat_agent, telegram_webhook_secret: telegram_webhook_secret
+  config :chat_agent, ChatAgent.Channel.Telegram, webhook_secret: telegram_webhook_secret
 end
 
 # Public ingress. Set TUNNEL_PROVIDER=ngrok on a development machine to open a

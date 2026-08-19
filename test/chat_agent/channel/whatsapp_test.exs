@@ -1,5 +1,7 @@
 defmodule ChatAgent.Channel.WhatsappTest do
-  use ExUnit.Case, async: true
+  # Not async: the configuration test below swaps this channel's credentials,
+  # and application configuration is global.
+  use ExUnit.Case, async: false
 
   alias ChatAgent.Channel.Message
   alias ChatAgent.Channel.Whatsapp
@@ -72,6 +74,18 @@ defmodule ChatAgent.Channel.WhatsappTest do
 
       assert {:error, %Req.TransportError{reason: :econnrefused}} =
                Whatsapp.send_message("1234567890", "Hello")
+    end
+  end
+
+  describe "configuration" do
+    test "says what is missing, and where to set it, when a credential is absent" do
+      configured = Application.get_env(:chat_agent, Whatsapp)
+      on_exit(fn -> Application.put_env(:chat_agent, Whatsapp, configured) end)
+      Application.put_env(:chat_agent, Whatsapp, Keyword.delete(configured, :access_token))
+
+      assert_raise RuntimeError,
+                   ~r/no access_token configured for ChatAgent.Channel.Whatsapp/,
+                   fn -> Whatsapp.send_message("1234567890", "Hello") end
     end
   end
 

@@ -4,6 +4,21 @@ defmodule ChatAgent.Channel.Telegram do
 
   Inbound, it receives a whole update object, which is the unit the Telegram
   webhook posts. Outbound, it posts text messages to the Bot API.
+
+  ## Configuration
+
+  This channel reads its own configuration, under its own module name:
+
+      config :chat_agent, ChatAgent.Channel.Telegram,
+        # The bot's token, from BotFather. Set from TELEGRAM_BOT_TOKEN.
+        bot_token: nil,
+        # Sent to Telegram when registering the webhook, and required back on
+        # every delivery. Set from TELEGRAM_WEBHOOK_SECRET. With none set, any
+        # request that reaches the webhook is accepted.
+        webhook_secret: nil,
+        # Passed to every Req call, which is what lets a test answer without a
+        # network.
+        req_options: []
   """
 
   @behaviour ChatAgent.Channel.Adapter
@@ -83,7 +98,7 @@ defmodule ChatAgent.Channel.Telegram do
 
   @impl true
   def authenticate(conn) do
-    case Application.get_env(:chat_agent, :telegram_webhook_secret) do
+    case config(:webhook_secret) do
       nil ->
         :ok
 
@@ -160,7 +175,7 @@ defmodule ChatAgent.Channel.Telegram do
   # by hand after changing `TELEGRAM_WEBHOOK_SECRET`.
   defp set_webhook(url) do
     payload =
-      case Application.get_env(:chat_agent, :telegram_webhook_secret) do
+      case config(:webhook_secret) do
         nil -> %{url: url}
         secret -> %{url: url, secret_token: secret}
       end
@@ -186,12 +201,12 @@ defmodule ChatAgent.Channel.Telegram do
   end
 
   defp api_url(method),
-    do: "https://api.telegram.org/bot#{get_config!(:telegram_bot_token)}/#{method}"
+    do: "https://api.telegram.org/bot#{config!(:bot_token)}/#{method}"
 
   defp request_options(options) do
     options
     |> Keyword.put_new(:headers, content_type: "application/json")
-    |> Keyword.merge(Application.get_env(:chat_agent, :telegram_req_options, []))
+    |> Keyword.merge(config(:req_options) || [])
   end
 
   # The Bot API answers 200 with `"ok" => false` for logical failures, so the
@@ -206,5 +221,19 @@ defmodule ChatAgent.Channel.Telegram do
 
   defp interpret_response({:error, exception}), do: {:error, exception}
 
-  defp get_config!(key), do: Application.fetch_env!(:chat_agent, key)
+  # This channel's own configuration, under its module name, read at call time
+  # so a change needs no recompile.
+  defp config(key), do: Application.get_env(:chat_agent, __MODULE__, [])[key]
+
+  defp config!(key) do
+    config(key) ||
+      raise """
+      no #{key} configured for #{inspect(__MODULE__)}.
+
+      Set it in config/runtime.exs from the environment, or in
+      config/<env>.override.exs while developing:
+
+          config :chat_agent, #{inspect(__MODULE__)}, #{key}: "..."
+      """
+  end
 end

@@ -5,6 +5,26 @@ defmodule ChatAgent.Channel.Whatsapp do
   Inbound, it receives one entry of the `messages` list a webhook delivers,
   after `ChatAgentWeb.WhatsappController` has unwrapped the entry/change
   envelope. Outbound, it posts text messages to the Cloud API.
+
+  ## Configuration
+
+  This channel reads its own configuration, under its own module name:
+
+      config :chat_agent, ChatAgent.Channel.Whatsapp,
+        # Answered back to Meta during the subscription handshake. Set from
+        # WHATSAPP_VERIFY_TOKEN.
+        verify_token: nil,
+        # The phone number's access token. Set from WHATSAPP_ACCESS_TOKEN.
+        access_token: nil,
+        # Which number messages are sent from. Set from
+        # WHATSAPP_PHONE_NUMBER_ID.
+        phone_number_id: nil,
+        # Graph API version, defaulted in config/config.exs and overridable
+        # with WHATSAPP_API_VERSION.
+        api_version: "v20.0",
+        # Passed to every Req call, which is what lets a test answer without a
+        # network.
+        req_options: []
   """
 
   @behaviour ChatAgent.Channel.Adapter
@@ -82,7 +102,7 @@ defmodule ChatAgent.Channel.Whatsapp do
         "hub.verify_token" => token,
         "hub.challenge" => challenge
       }) do
-    if token == get_config(:whatsapp_verify_token, nil) do
+    if token == config(:verify_token) do
       {:ok, challenge}
     else
       {:error, :forbidden}
@@ -102,9 +122,9 @@ defmodule ChatAgent.Channel.Whatsapp do
 
   @impl true
   def send_message(to, body) do
-    phone_number_id = get_config!(:whatsapp_phone_number_id)
-    access_token = get_config!(:whatsapp_access_token)
-    api_version = get_config(:whatsapp_api_version, "v20.0")
+    phone_number_id = config!(:phone_number_id)
+    access_token = config!(:access_token)
+    api_version = config(:api_version) || "v20.0"
 
     url = "https://graph.facebook.com/#{api_version}/#{phone_number_id}/messages"
 
@@ -124,7 +144,7 @@ defmodule ChatAgent.Channel.Whatsapp do
       json: payload
     ]
 
-    req_options = Application.get_env(:chat_agent, :whatsapp_req_options, [])
+    req_options = config(:req_options) || []
 
     url
     |> Req.post(Keyword.merge(options, req_options))
@@ -159,7 +179,19 @@ defmodule ChatAgent.Channel.Whatsapp do
 
   defp interpret_response({:error, exception}), do: {:error, exception}
 
-  defp get_config!(key), do: Application.fetch_env!(:chat_agent, key)
+  # This channel's own configuration, under its module name, read at call time
+  # so a change needs no recompile.
+  defp config(key), do: Application.get_env(:chat_agent, __MODULE__, [])[key]
 
-  defp get_config(key, default), do: Application.get_env(:chat_agent, key, default)
+  defp config!(key) do
+    config(key) ||
+      raise """
+      no #{key} configured for #{inspect(__MODULE__)}.
+
+      Set it in config/runtime.exs from the environment, or in
+      config/<env>.override.exs while developing:
+
+          config :chat_agent, #{inspect(__MODULE__)}, #{key}: "..."
+      """
+  end
 end
