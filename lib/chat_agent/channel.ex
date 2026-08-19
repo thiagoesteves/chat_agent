@@ -82,6 +82,10 @@ defmodule ChatAgent.Channel do
   Returns whatever the channel module returns, or `{:error, {:unknown_channel,
   channel}}` when none is configured for it.
 
+  Options say who is sending, for the broadcast that follows: `:sender`, which
+  defaults to `"you"` for a person at the dashboard, and `:identifiers` to name
+  what the sender wants a reader to see, such as the session that answered.
+
   ## Examples
 
       iex> ChatAgent.Channel.send_message(:telegram, 123_456, "Hello")
@@ -90,9 +94,13 @@ defmodule ChatAgent.Channel do
       iex> ChatAgent.Channel.send_message(:carrier_pigeon, "anyone", "Hello")
       {:error, {:unknown_channel, :carrier_pigeon}}
   """
-  @spec send_message(channel :: channel(), recipient :: Adapter.recipient(), body :: String.t()) ::
-          :ok | {:error, term()}
-  def send_message(channel, recipient, body) do
+  @spec send_message(
+          channel :: channel(),
+          recipient :: Adapter.recipient(),
+          body :: String.t(),
+          options :: keyword()
+        ) :: :ok | {:error, term()}
+  def send_message(channel, recipient, body, options \\ []) do
     case adapter(channel) do
       nil ->
         {:error, {:unknown_channel, channel}}
@@ -101,7 +109,7 @@ defmodule ChatAgent.Channel do
         with :ok <- module.send_message(recipient, body) do
           # Subscribers see a reply the same way they see an inbound message, so
           # a conversation reads as a whole and every open view stays in step.
-          broadcast(channel, sent_message(recipient, body))
+          broadcast(channel, sent_message(recipient, body, options))
         end
     end
   end
@@ -189,17 +197,20 @@ defmodule ChatAgent.Channel do
   end
 
   # A service does not hand back a message when it accepts one, so the reply is
-  # described from what was asked of it. `sender` is this app rather than a
-  # person, and the conversation is where the reply went.
-  defp sent_message(recipient, body) do
+  # described from what was asked of it. The conversation is where the reply
+  # went, and `sender` is whoever in this app sent it: a person at the
+  # dashboard by default, or the assistant that answered when one did. That is
+  # the difference between "sent from this dashboard" and "sent by claude", and
+  # a reader can only tell them apart if the sender travels with the message.
+  defp sent_message(recipient, body, options) do
     recipient = to_string(recipient)
 
     Message.new(
-      sender: "you",
+      sender: Keyword.get(options, :sender, "you"),
       conversation: recipient,
       text: body,
       direction: :outbound,
-      identifiers: [{"to", recipient}]
+      identifiers: Keyword.get(options, :identifiers, []) ++ [{"to", recipient}]
     )
   end
 

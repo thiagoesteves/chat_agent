@@ -27,6 +27,13 @@ lib/
     commander/
       adapter.ex            # behaviour the OS binding implements
       local.ex              # erlexec binding, the only implementation
+    assistant.ex            # ChatAgent.Assistant, the facade over what answers
+    assistant/
+      adapter.ex            # behaviour every assistant implements
+      claude.ex             # the claude command line tool, through Commander
+      router.ex             # who gets a session, and which one holds them
+      session.ex            # one conversation, as a process
+      supervisor.ex         # the router and the supervisor sessions run under
     tunnel.ex               # ChatAgent.Tunnel, the public URL facade
     tunnel/
       server.ex             # :gen_statem keeping a public URL open
@@ -87,7 +94,7 @@ A key belongs to exactly one channel, so nothing has to be prefixed to stay apar
 Defaults live in `config/config.exs`, secrets are read from the environment in `config/runtime.exs`, and each key there is set only when its variable is present, so a local `config/<env>.override.exs` is never overwritten with a nil.
 
 Runtime configuration comes from environment variables read in `config/runtime.exs`:
-`WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `HEALTHCHECK_LOGGING`, `TUNNEL_PROVIDER`, `PUBLIC_URL`, `NGROK_AUTHTOKEN`, `NGROK_DOMAIN`.
+`ASSISTANT_PASSWORD`, `ASSISTANT_WORKING_DIR_ROOT`, `ASSISTANT_WORKING_DIR`, `CLAUDE_EXECUTABLE`, `CLAUDE_ALLOWED_TOOLS`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `HEALTHCHECK_LOGGING`, `TUNNEL_PROVIDER`, `PUBLIC_URL`, `NGROK_AUTHTOKEN`, `NGROK_DOMAIN`.
 
 ### The public URL
 
@@ -138,10 +145,157 @@ The URL is read out of the agent's stdout, buffered until a whole line is availa
 A channel reads what its service currently has registered first and answers `{:ok, :unchanged}` when it already matches, so restarting the app is not a write to someone else's API.
 A channel whose service takes no callback URL over its API answers `{:error, :not_supported}` and is not asked again, which is what WhatsApp does: the Cloud API sets it on the app itself rather than through the messaging credentials this app holds.
 
+### Answering a conversation
+
+`ChatAgent.Assistant` is the facade over anything that can answer a person, and `ChatAgent.Assistant.Router` decides who gets to ask.
+A conversation starts closed:
+
+```
+/auth <password>                        open a session on the default assistant
+/auth-<name> <password>                 name the assistant instead
+/auth <password> --work-dir my-app-folder    say where it works
+/stop                                   close the session
+```
+
+Quotes are only needed for a password with a space in it.
+
+`--work-dir` names one directory **under `working_dir_root`**, which is the prefix a conversation types the tail of: with the root set to a workspace, `--work-dir my-app-folder` means that repository and nothing else.
+Whoever knows the password picks this, so what is typed is resolved against the root and checked to have landed inside it: a name, a path climbing out with `..`, and an absolute path elsewhere are the same question, answered by where it ends up.
+Without a root configured, no conversation chooses and the assistant works wherever it was configured to.
+Set the root in `config/<env>.override.exs` per machine, or from `ASSISTANT_WORKING_DIR_ROOT`.
+
+**Both live under `ChatAgent.Assistant`, and the default is written the way a conversation writes it:**
+
+```elixir
+config :chat_agent, ChatAgent.Assistant,
+  working_dir_root: "/srv/checkouts",
+  working_dir: "chat_agent"
+```
+
+One root governs both, so neither repeats the other and there is one place to change when the checkouts move.
+An absolute `working_dir` is accepted only where no root is configured, which is the case of an assistant that works in exactly one place; a conversation never reaches that path, since `--work-dir` refuses without a root.
+A default that does not resolve is logged as `assistant_working_dir_unusable` rather than silently ignored, and a root set on an assistant module instead is named at boot.
+
+An open conversation is a `ChatAgent.Assistant.Session` process, started under a `DynamicSupervisor`, and everything about that conversation lives in it: the assistant it is talking to, the turns so far, and the idle timer.
+That is why asking is allowed to block: it blocks the one conversation waiting for its own answer, and the router stays free to let the next person in.
+The session ends by being asked to, by sitting idle, or by the router going down, and all three are the same ending: the conversation it held goes with it.
+
+The router is what holds the protections, and each one exists for a reason worth keeping:
+
+| Protection | Why |
+|---|---|
+| A wrong password is answered with silence | Saying "wrong password" confirms to whoever is guessing that a password is what opens this |
+| No password configured means nobody is let in, and the router is not even started | A default password is a password everybody knows |
+| The password is compared with `Plug.Crypto.secure_compare/2` | A comparison that stops at the first wrong byte reports how much of a guess was right |
+| A session closes after `session_timeout`, five minutes by default, and says so | A conversation somebody walked away from should not stay answerable, and one that ends in silence is indistinguishable from an assistant that broke |
+| `/stop` closes one straight away | Waiting five minutes to end a conversation you have finished is not an answer |
+| Only the last `history_limit` turns go into a prompt | A long conversation would otherwise grow a prompt without limit |
+| Each conversation is its own process | One slow answer would otherwise stop every other conversation from being answered |
+| Everything shown, stored or logged goes through `ChatAgent.Assistant.redact/1` | A password typed into a chat would otherwise be readable off the dashboard, out of the logs, and out of every prompt after it |
+| The assistant holds its own deadline and stops what it started | erlexec's own timeout bounds starting a process, not running one, so a tool that hangs would be waited on for as long as it hangs |
+
+A session says so when it opens and when it closes, on the `"assistant"` topic, which is how the dashboard shows which conversation is being answered and by what without asking anything.
+Its identifier travels with every reply it sends, through `ChatAgent.Channel.send_message/4`'s `:sender` and `:identifiers` options: a reply written by an assistant says so, and only one typed at the dashboard says it came from there.
+
+An assistant reports its failures as itself, and the session turns each into what the person waiting is told, and into whether there is any point carrying on.
+
+| Reason | What the person is told | The session |
+|---|---|---|
+| `:timeout` | that it took too long, and to ask for less | stays open, since the next question may be smaller |
+| `{:executable_not_found, name}` | that the tool is not installed here | closes, since that will not change while it is open |
+| `{:command_failed, said}` | what the tool said, when that is about the service rather than about this machine | closes |
+| anything else | an apology | closes |
+
+Relaying what a tool said is deliberate: hitting a usage limit is the asker's to know, and an apology they can do nothing with is worse than the sentence the tool already wrote.
+What is held back is anything carrying a filesystem path, since that describes this machine to somebody who cannot see it.
+A word with a slash inside it, such as a time zone, is not a path.
+
+### What the assistant is allowed to do
+
+Permissions are the security question in this app, because the prompt comes from whoever authenticated with the bot, and what the tool does it does as whoever is running this.
+Granting `"Bash(gh:*)"` grants it to every conversation that knows the password.
+
+Nothing is granted by default: the list starts empty, and in this mode the tool refuses what it has no permission for rather than asking, since nobody is at a terminal to answer.
+
+```elixir
+config :chat_agent, ChatAgent.Assistant.Claude,
+  working_dir: "/srv/checkouts/the-one-repository",
+  allowed_tools: ["Read", "Grep", "Bash(git status)", "Bash(git diff:*)"],
+  disallowed_tools: ["Bash(rm:*)"],
+  permission_mode: "acceptEdits",
+  add_dirs: [],
+  model: nil,
+  extra_args: []
+```
+
+`ASSISTANT_WORKING_DIR_ROOT`, `ASSISTANT_WORKING_DIR` and `CLAUDE_ALLOWED_TOOLS`, a comma separated list, set what matters most from the environment.
+Grant the narrowest thing that does the job, and prefer a `working_dir` holding one repository over a broad `add_dirs`.
+
+A policy longer than a list belongs in a settings file of its own, which says what is refused as well as what is allowed:
+
+```elixir
+config :chat_agent, ChatAgent.Assistant.Claude,
+  settings: "/etc/chat_agent/claude-settings.json",
+  permission_mode: "acceptEdits"
+```
+
+`priv/claude/settings.example.json` is a worked example for a bot that opens branches and pull requests.
+Three things in it are worth copying whatever else changes:
+
+- **Pushes are allowed only to a branch namespace**, `Bash(git push origin bot/*)`, so the bot cannot land on `main` even by asking nicely
+- **Deny beats allow**, so the dangerous shapes are written out rather than left to the absence of an allow rule: force pushes, `git reset --hard`, `gh auth`, `gh secret`, reading `.env`
+- **The credentials it borrows are the real limit.** It acts as whoever runs this app, so give that user a fine-grained token scoped to the one repository, and a checkout of nothing else
+
+### What was measured, rather than assumed
+
+The tool behaves differently when it is run with `-p`, which is how this app runs it, and the differences decide whether a policy has any effect at all.
+Each row below was checked by running the real tool.
+
+| Behaviour | Result |
+|---|---|
+| A policy passed with `--settings` (the `settings:` key) | applies |
+| A repository's own `.claude/settings.json`, no flags | **ignored** |
+| `~/.claude/settings.json`, no flags | ignored by the same mechanism, which is what `setting_sources: ["user"]` exists to change |
+| A read-only command such as `git status` | runs with no rule at all |
+| A write **inside** the working directory, under `permission_mode: "acceptEdits"` | allowed, with no `Write` rule |
+| A write **outside** the working directory, same mode | **refused** unless `Write` or `Edit` is in the allow list |
+| `permission_mode: "bypassPermissions"` | reaches outside the working directory with no rule at all |
+| A `deny` rule under `bypassPermissions` | **still refused**, which makes the deny list the last guard if that mode is ever used |
+| `cd <repo> && git checkout -b x`, with `Bash(cd:*)` **and** `Bash(git checkout:*)` allowed | **refused**: a compound command is not matched by rules covering each part |
+| `git -C <repo> checkout -b x`, with `Bash(git -C:*)` | runs |
+
+| `git -C <repo outside the working directory> …`, with `Bash(git -C:*)` and no `add_dirs` | runs |
+| `WebFetch(domain:example.com)` fetching another domain | refused, so domain scoping holds |
+| `WebFetch` with no pattern | fetches any domain |
+| `WebFetch` allowed and one domain denied | refused for that domain, since deny beats allow |
+| The same file written by a file tool | refused unless the directory is in `add_dirs` |
+
+Those last two together are the shape of the boundary, and it is not the one the directory settings suggest.
+**A shell command is not confined to the working directory at all**: `working_dir` and `add_dirs` scope the file tools, `Read`, `Edit` and `Write`, while a `Bash` rule is matched against the command string and can reach anything the user running this app can reach.
+Granting `Bash(git -C:*)` grants every git repository on the machine, not the one the bot was pointed at.
+
+The compound-command result decides how a bot working across several repositories should be told to work.
+Running from a directory that holds many of them means reaching into one, and `cd repo && …` is refused however the parts are allowed, so either point `working_dir` at the single repository the bot works in, or grant `git -C` shaped rules and say so in the prompt.
+
+The last two are the ones that surprise: a policy full of `Bash(...)` rules and no `Write` rule works perfectly until the tool reaches for a file outside the tree, and in `-p` there is no prompt to approve it, so it simply refuses.
+
+Prefer the app's own settings file over `setting_sources`: the bot's policy is then reviewed where the bot is deployed, rather than by whoever last edited the repository it is working in, and it cannot pick up a personal allow list that was accumulated by clicking "yes" in an interactive session.
+
+**A reply that could not be sent is logged.**
+Only a message the channel accepted is broadcast, so a rejected reply reaches neither the person nor the dashboard: without `assistant_reply_not_sent` in the log, that looks exactly like a bug in here.
+
 ### Running OS commands
 
 Everything that leaves the BEAM for the operating system goes through `ChatAgent.Commander`, which resolves its adapter from configuration on every call.
 `ChatAgent.Commander.Local` is the only implementation and binds straight to erlexec, one line per call, so tests swap the whole thing for `ChatAgent.CommanderMock` and nothing reaches the machine.
+
+A command is either a string, which a shell reads, or a list of an executable and its arguments, which no shell sees.
+Anything carrying text from a stranger must use the list form: a prompt typed into a chat would otherwise have its punctuation read as syntax.
+`ChatAgent.Assistant.Claude` uses the list form for exactly that reason, and the tunnel provider uses a string because the command line is its own.
+
+**Look for an executable before running it.**
+`System.find_executable/1` first, and `{:error, {:executable_not_found, name}}` when it is not there.
+Left to the run, a missing tool arrives as an exit status wrapped around a sentence from a shell, which reads like the tool refused rather than like it was never installed.
 
 erlexec refuses to start when the BEAM runs as root.
 A deployment that does (a container running as root, say) has to configure `config :erlexec, root: true, user: "...", limit_users: ["..."]` for the app to boot at all, which is one more reason a deployment behind DNS runs no tunnel.

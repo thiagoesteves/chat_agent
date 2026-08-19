@@ -16,12 +16,51 @@ defmodule ChatAgent.Application do
         {Phoenix.PubSub, name: ChatAgent.PubSub},
         # Start to serve requests, typically the last entry
         ChatAgentWeb.Endpoint
-      ] ++ tunnel()
+      ] ++ assistant() ++ tunnel()
 
     # See https://elixir.hexdocs.pm/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: ChatAgent.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  # `working_dir` belongs to an assistant, and `working_dir_root` to the
+  # sessions that may choose one, which puts two similar names in two places.
+  # Setting the root on the assistant is silent otherwise: nothing reads it,
+  # and every --work-dir is refused with no reason given.
+  defp warn_about_misplaced_root do
+    Enum.each(ChatAgent.Assistant.list(), fn {name, module} ->
+      if Application.get_env(:chat_agent, module, [])[:working_dir_root] do
+        Logger.warning(%{
+          what: "assistant_working_dir_root_misplaced",
+          assistant: name,
+          reason: "set :working_dir_root under ChatAgent.Assistant, not under #{inspect(module)}"
+        })
+      end
+    end)
+  end
+
+  # A router with no password lets nobody in, and one with no assistant has
+  # nothing to answer with. Either way there is no work, so it is not started
+  # and the reason is said once at boot rather than guessed at later.
+  defp assistant do
+    warn_about_misplaced_root()
+
+    cond do
+      ChatAgent.Assistant.enabled?() ->
+        [{ChatAgent.Assistant.Supervisor, []}]
+
+      ChatAgent.Assistant.list() == [] ->
+        []
+
+      true ->
+        Logger.info(%{
+          what: "assistant_router_not_started",
+          reason: "no password configured, so no conversation could be answered"
+        })
+
+        []
+    end
   end
 
   # The tunnel forwards to the endpoint, so it is started after it, and only

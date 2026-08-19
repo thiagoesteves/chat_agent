@@ -121,6 +121,7 @@
   --accent: #4f46e5;
   --live: #16a34a;
   --danger: #dc2626;
+  --claude: #c15f3c;
   --whatsapp: #25d366;
   --telegram: #29a9eb;
   --toggle-active: #ffffff;
@@ -139,6 +140,7 @@
     --accent: #818cf8;
     --live: #4ade80;
     --danger: #f87171;
+    --claude: #e08a68;
     --toggle-active: #4b5661;
   }
 }
@@ -155,6 +157,7 @@ html[data-theme="dark"] .theme-toggle {
   --accent: #818cf8;
   --live: #4ade80;
   --danger: #f87171;
+  --claude: #e08a68;
   --toggle-active: #4b5661;
 }
 
@@ -529,6 +532,45 @@ main:has(.page-wide) {
     animation: none;
     transition: none;
   }
+}
+
+/* Session badge ----------------------------------------------------------- */
+
+/* Sits beside the subscription badge: whether a channel is listening, and
+ * whether anything is answering on it, are two halves of the same question.
+ */
+.session-badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3125rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.75rem;
+  font-weight: 550;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* An assistant that has a colour of its own wears it, the way each channel
+ * does, so the badge is recognised before it is read.
+ */
+.session-badge.is-claude {
+  color: var(--claude);
+}
+
+.session-mark {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex: none;
+}
+
+.session-id {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
 }
 
 /* Subscription badge ------------------------------------------------------ */
@@ -957,11 +999,17 @@ html[data-theme="dark"] .channel-body.is-telegram {
  * the list, renders last, and the scroll container stays pinned to the bottom
  * as messages arrive without any JavaScript.
  *
- * In a reversed column the main axis runs upwards, so flex-end is the top:
- * that is what makes the first messages sit at the top of an empty pane and
- * grow downwards, instead of hanging off the bottom of it. Once they overflow,
- * justify-content stops applying and the pane scrolls, still pinned to the
- * newest.
+ * A short list sits at the top of the pane and grows downwards, which is an
+ * auto margin's job rather than justify-content's. In a reversed column the
+ * main axis runs upwards, so the newest message, first in the list, is the
+ * bottom one: an auto margin below it absorbs the free space and pushes the
+ * group up. Once the messages overflow, the auto margin collapses to nothing
+ * and the pane scrolls, still pinned to the newest.
+ *
+ * justify-content: flex-end looks like it would do the same and does not: with
+ * no free space left it overflows past the start edge, which here is the
+ * bottom, so the newest messages end up below the pane with no way to scroll
+ * to them.
  *
  * The trade is that DOM order stays newest first, so a screen reader hears the
  * newest message first while a sighted reader sees it last.
@@ -970,7 +1018,6 @@ html[data-theme="dark"] .channel-body.is-telegram {
   display: flex;
   flex: 1;
   flex-direction: column-reverse;
-  justify-content: flex-end;
   gap: 0.375rem;
   margin: 0;
   padding: 0.75rem;
@@ -981,6 +1028,10 @@ html[data-theme="dark"] .channel-body.is-telegram {
 
 .message {
   display: flex;
+}
+
+.message:first-child {
+  margin-bottom: auto;
 }
 
 /* A reply sits on the right, the side a chat client puts your own messages on. */

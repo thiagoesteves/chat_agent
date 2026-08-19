@@ -42,3 +42,6 @@ npm-debug.log
 # Local configuration overrides and individual secrets, per MIX_ENV.
 config/*.override.exs
 
+# Claude config files
+claude.settings.local.json
+
