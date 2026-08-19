@@ -108,9 +108,12 @@ if System.get_env("PHX_SERVER") do
   config :chat_agent, ChatAgentWeb.Endpoint, server: true
 end
 
-config :chat_agent, ChatAgent.Repo,
-  database: System.get_env("DATABASE_PATH") || "priv/repo/chat_agent.db",
-  pool_size: 1
+# The database path, set only when the variable is there. Development and test
+# each name their own file in config/<env>.exs, and overwriting those from here
+# would point the test suite at the development database.
+if database_path = System.get_env("DATABASE_PATH") do
+  config :chat_agent, ChatAgent.Repo, database: database_path
+end
 
 config :chat_agent, ChatAgentWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
@@ -146,6 +149,12 @@ if config_env() == :prod do
   host = System.get_env("PHX_HOST") || "example.com"
 
   config :chat_agent, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+
+  # SQLite is a file, so a release needs somewhere to keep it. DATABASE_PATH,
+  # read above, points it at a mounted volume.
+  config :chat_agent, ChatAgent.Repo,
+    database: System.get_env("DATABASE_PATH") || "priv/repo/chat_agent.db",
+    pool_size: 1
 
   # Reachable over DNS, so the public URL is the endpoint's own host and no
   # tunnel is run. PUBLIC_URL, already set above, still wins when there is one.

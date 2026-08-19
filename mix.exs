@@ -147,7 +147,11 @@ defmodule ChatAgent.MixProject do
   # See `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "assets.setup", "assets.build"],
+      setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],
+      # Creating, migrating and seeding are one step, so a fresh clone reaches a
+      # database it can log into rather than an empty one.
+      "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
+      "ecto.reset": ["ecto.drop", "ecto.setup"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       # Compiling first is what makes colocated JS and the icon set available to
       # the bundler, so the order matters.
@@ -157,10 +161,10 @@ defmodule ChatAgent.MixProject do
         "esbuild chat_agent --minify",
         "phx.digest"
       ],
+      # `mix test` runs under MIX_ENV=test, so this prepares the test database
+      # and leaves the development one alone.
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       precommit: [
-        "ecto.drop",
-        "ecto.create",
-        "ecto.migrate",
         "compile --warnings-as-errors",
         "deps.unlock --unused",
         "format",

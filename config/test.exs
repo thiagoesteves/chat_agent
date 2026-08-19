@@ -46,6 +46,10 @@ config :chat_agent, ChatAgent.Channel.Telegram,
   webhook_secret: "test_telegram_webhook_secret",
   req_options: [plug: {Req.Test, ChatAgent.Channel.Telegram}]
 
+# SQLite takes one writer at a time, so a single pooled connection is what keeps
+# concurrent `async: true` tests from colliding on it. Sandbox ownership then
+# hands that connection to one test at a time; everything else still runs async.
 config :chat_agent, ChatAgent.Repo,
   database: "priv/repo/test.sqlite3",
-  pool: Ecto.Adapters.SQL.Sandbox
+  pool: Ecto.Adapters.SQL.Sandbox,
+  pool_size: 1
