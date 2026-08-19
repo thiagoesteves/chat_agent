@@ -9,9 +9,13 @@ import { Socket } from "phoenix";
 import { LiveSocket } from "phoenix_live_view";
 // One file per hook under ./hooks, named after the hook it exports.
 import AutoDismissFlash from "./hooks/autoDismissFlash";
+import CopyToClipboard from "./hooks/copyToClipboard";
+import KeepSummaryClosed from "./hooks/keepSummaryClosed";
 
 const Hooks = {
   AutoDismissFlash,
+  CopyToClipboard,
+  KeepSummaryClosed,
 };
 
 const csrfToken = document

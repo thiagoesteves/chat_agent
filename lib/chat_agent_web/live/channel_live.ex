@@ -11,6 +11,7 @@ defmodule ChatAgentWeb.ChannelLive do
 
   alias ChatAgent.Channel
   alias ChatAgent.Channel.Message
+  alias ChatAgent.Tunnel
 
   # Messages are kept in assigns rather than persisted anywhere, so this is a
   # live monitor, not a history: it shows what arrives while it is open.
@@ -23,6 +24,7 @@ defmodule ChatAgentWeb.ChannelLive do
     subscribed =
       if connected?(socket) do
         Enum.each(channels, fn {channel, _module} -> Channel.subscribe(channel) end)
+        Tunnel.subscribe()
         MapSet.new(channels, fn {channel, _module} -> channel end)
       else
         MapSet.new()
@@ -39,6 +41,7 @@ defmodule ChatAgentWeb.ChannelLive do
        end)
      )
      |> assign(:subscribed, subscribed)
+     |> assign_tunnel()
      |> assign(:messages, Map.new(channels, fn {channel, _module} -> {channel, []} end))
      |> assign(
        :forms,
@@ -57,6 +60,10 @@ defmodule ChatAgentWeb.ChannelLive do
   # A browser leaves a disabled input out of what it submits, and the composer
   # is disabled until a channel has a conversation to reply to, so the body is
   # not a key these can count on being there.
+  def handle_info({:tunnel, %Tunnel.Status{} = status}, socket) do
+    {:noreply, assign_tunnel(socket, status)}
+  end
+
   @impl true
   def handle_event("compose", %{"send" => %{"channel" => name} = send}, socket) do
     # The composer's text is kept here rather than only in the browser, so that
@@ -73,6 +80,155 @@ defmodule ChatAgentWeb.ChannelLive do
     # service, it can only answer one.
     {:noreply, send_reply(socket, channel_named(socket, name), String.trim(body(send)))}
   end
+
+  # The URLs the chat services have to call, and, when one is being run for
+  # them, the tunnel that provides them. Collapsed, because the messages are
+  # what this page is for: one line is enough to see the tunnel is up and to
+  # copy the URL, and everything else is a click away.
+  #
+  # A deployment behind DNS runs no tunnel, so there is nothing to report about
+  # one there: the callbacks are the whole strip.
+  attr :tunnel, ChatAgent.Tunnel.Status, required: true
+  attr :public_url, :any, required: true
+  attr :channels, :list, required: true
+
+  defp tunnel_panel(assigns) do
+    ~H"""
+    <details class="tunnel" id="tunnel-panel">
+      <summary class="tunnel-summary">
+        <span class="tunnel-chevron" aria-hidden="true"></span>
+
+        <span :if={@tunnel.state != :disabled} class={["tunnel-state", "is-#{@tunnel.state}"]}>
+          <span class="conn-dot"></span>
+          {tunnel_state_label(@tunnel.state)}
+        </span>
+
+        <span :if={@tunnel.state == :disabled} class="tunnel-label">Callbacks</span>
+
+        <%= case @public_url do %>
+          <% {:ok, url} -> %>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener"
+              class="tunnel-summary-url"
+              id="tunnel-url"
+              phx-hook="KeepSummaryClosed"
+            >
+              {url}
+            </a>
+            <.copy_button value={url} label="Copy the public URL" />
+          <% {:error, reason} -> %>
+            <span class="tunnel-summary-pending">{no_url_reason(reason)}</span>
+        <% end %>
+      </summary>
+
+      <div class="tunnel-body">
+        <p :if={@tunnel.state != :disabled} class="tunnel-provider">
+          {provider_name(@tunnel.provider)}
+          <span :if={@tunnel.since}>· since {Calendar.strftime(@tunnel.since, "%H:%M")}</span>
+        </p>
+
+        <p :if={@tunnel.error} class="tunnel-error">
+          Last error: <code>{inspect(@tunnel.error)}</code>
+        </p>
+
+        <p class="tunnel-callbacks-hint">
+          What each service should be told to call.
+        </p>
+
+        <ul class="callback-list">
+          <li :for={{channel, _module} <- @channels} class="callback">
+            <span class={["callback-channel", "is-#{channel}"]}>{channel}</span>
+
+            <%= case @public_url do %>
+              <% {:ok, url} -> %>
+                <code class="callback-url">{Channel.webhook_url(channel, url)}</code>
+                <.copy_button
+                  value={Channel.webhook_url(channel, url)}
+                  label={"Copy the #{channel} callback URL"}
+                />
+              <% {:error, reason} -> %>
+                <code class="callback-url is-partial">/{channel}/webhook</code>
+                <span class="callback-note">{no_url_reason(reason)}</span>
+            <% end %>
+
+            <span
+              :if={@tunnel.state != :disabled}
+              class={["callback-state", registration_class(@tunnel.webhooks[channel])]}
+            >
+              {registration_label(@tunnel.webhooks[channel])}
+            </span>
+          </li>
+        </ul>
+      </div>
+    </details>
+    """
+  end
+
+  attr :value, :string, required: true
+  attr :label, :string, required: true
+
+  defp copy_button(assigns) do
+    ~H"""
+    <button
+      type="button"
+      class="copy-button"
+      phx-hook="CopyToClipboard"
+      id={"copy-#{:erlang.phash2(@value)}"}
+      data-copy={@value}
+      aria-label={@label}
+      title={@label}
+    >
+      <span class="copy-button-text">Copy</span>
+    </button>
+    """
+  end
+
+  # A lookup rather than a clause per state, so a state nobody wrote a label
+  # for reads as unknown instead of crashing the page that reports it.
+  @state_labels %{
+    connected: "Connected",
+    registering: "Registering",
+    connecting: "Starting agent",
+    authenticating: "Authenticating",
+    down: "Not running"
+  }
+
+  defp tunnel_state_label(state), do: Map.get(@state_labels, state, "Unknown")
+
+  defp provider_name(nil), do: "No agent"
+  defp provider_name(provider), do: provider.name()
+
+  # A channel is only reported on once the tunnel has had a URL to tell it
+  # about, so nothing said yet is its own answer rather than a failure.
+  defp registration_label(nil), do: "Not registered yet"
+  defp registration_label({:ok, :registered}), do: "Registered"
+  defp registration_label({:ok, :unchanged}), do: "Already pointed here"
+  defp registration_label({:error, :not_supported}), do: "Set outside this app"
+  defp registration_label({:error, _reason}), do: "Registration failed"
+
+  defp registration_class({:ok, _outcome}), do: "is-ok"
+  defp registration_class({:error, :not_supported}), do: "is-muted"
+  defp registration_class({:error, _reason}), do: "is-error"
+  defp registration_class(nil), do: "is-muted"
+
+  defp no_url_reason(:not_connected), do: "waiting for the tunnel"
+  defp no_url_reason(:not_configured), do: "no public URL configured"
+
+  defp assign_tunnel(socket, status \\ Tunnel.status()) do
+    socket
+    |> assign(:tunnel, status)
+    |> assign(:public_url, public_url(status))
+  end
+
+  # The broadcast status carries the URL the tunnel has open, and is the
+  # freshest thing this view has: asking the facade again would answer from the
+  # server's own state, which is a round trip to learn what just arrived. Only
+  # a status with no URL falls back to the configured one, which is how a
+  # deployment behind DNS answers.
+  defp public_url(%Tunnel.Status{url: nil}), do: Tunnel.url()
+  defp public_url(%Tunnel.Status{url: url}), do: {:ok, url}
 
   defp body(send), do: Map.get(send, "body", "")
 
@@ -129,13 +285,11 @@ defmodule ChatAgentWeb.ChannelLive do
     ~H"""
     <Layouts.app flash={@flash} max_width="page-wide">
       <div class="channels">
-        <header class="channels-header">
-          <h1>Channels</h1>
-          <p class="channels-subtitle">
-            Every module implementing <code>ChatAgent.Channel.Adapter</code>, and the messages
-            arriving on it.
-          </p>
-        </header>
+        <.tunnel_panel
+          tunnel={@tunnel}
+          public_url={@public_url}
+          channels={@channels}
+        />
 
         <div class="channel-grid">
           <section :for={{channel, module} <- @channels} class="channel-card">
@@ -192,10 +346,6 @@ defmodule ChatAgentWeb.ChannelLive do
                   </div>
                 </li>
               </ol>
-
-              <p :if={@messages[channel] == []} class="channel-empty">
-                Waiting for messages on <code>{Channel.topic(channel)}</code>
-              </p>
 
               <.form
                 for={@forms[channel]}
