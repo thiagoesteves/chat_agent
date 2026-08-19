@@ -23,6 +23,14 @@ config :phoenix,
 
 config :chat_agent, ChatAgent.Commander, adapter: ChatAgent.CommanderMock
 
+# No password, so the application starts no router: a test that wants one
+# starts its own, under its own name.
+config :chat_agent, ChatAgent.Assistant,
+  default: :claude,
+  session_timeout: :timer.minutes(5),
+  history_limit: 4,
+  adapters: [claude: ChatAgent.AssistantMock]
+
 config :chat_agent, ChatAgent.Channel.Whatsapp,
   verify_token: "test_verify_token",
   access_token: "test_access_token",

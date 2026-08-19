@@ -30,6 +30,34 @@ if telegram_webhook_secret = System.get_env("TELEGRAM_WEBHOOK_SECRET") do
   config :chat_agent, ChatAgent.Channel.Telegram, webhook_secret: telegram_webhook_secret
 end
 
+# The password a conversation has to give before an assistant answers it.
+# Unset means nobody is let in, which is the right default for something that
+# listens to whoever can reach the bot.
+if assistant_password = System.get_env("ASSISTANT_PASSWORD") do
+  config :chat_agent, ChatAgent.Assistant, password: assistant_password
+end
+
+if working_dir_root = System.get_env("ASSISTANT_WORKING_DIR_ROOT") do
+  config :chat_agent, ChatAgent.Assistant, working_dir_root: working_dir_root
+end
+
+if claude_executable = System.get_env("CLAUDE_EXECUTABLE") do
+  config :chat_agent, ChatAgent.Assistant.Claude, executable: claude_executable
+end
+
+# Where sessions work, and the one place --work-dir may pick from.
+if working_dir = System.get_env("ASSISTANT_WORKING_DIR") do
+  config :chat_agent, ChatAgent.Assistant, working_dir: working_dir
+end
+
+# What the tool may do, as a comma separated list, granted to every
+# conversation that knows the password. Nothing is granted without this.
+if claude_allowed_tools = System.get_env("CLAUDE_ALLOWED_TOOLS") do
+  config :chat_agent, ChatAgent.Assistant.Claude,
+    allowed_tools:
+      claude_allowed_tools |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
+end
+
 # Public ingress. Set TUNNEL_PROVIDER=ngrok on a development machine to open a
 # public URL for the chat services to call back on, which is what removes the
 # need for a DNS name there. A deployment that has one sets PUBLIC_URL instead,

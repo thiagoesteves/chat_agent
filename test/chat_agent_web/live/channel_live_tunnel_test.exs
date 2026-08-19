@@ -129,8 +129,27 @@ defmodule ChatAgentWeb.ChannelLiveTunnelTest do
 
       html = render(view)
       assert html =~ "Registration failed"
-      assert html =~ "Last error"
-      assert html =~ "agent_exited"
+      # The error is a sentence rather than a tuple.
+      assert html =~ "The agent stopped"
+    end
+
+    test "words the errors somebody can act on", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/channels")
+
+      for {error, sentence} <- [
+            {{:executable_not_found, "ngrok"}, "ngrok was not found on the PATH"},
+            {:connect_timeout, "did not report a URL in time"},
+            {:registration_failed, "could not be told where to call"},
+            {{:something_new, 42}, "Last error:"}
+          ] do
+        Tunnel.broadcast(%Status{
+          state: :authenticating,
+          provider: ChatAgent.Tunnel.Provider.Ngrok,
+          error: error
+        })
+
+        assert render(view) =~ sentence
+      end
     end
 
     test "offers each URL for copying, since they are pasted elsewhere", %{conn: conn} do

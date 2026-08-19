@@ -52,14 +52,21 @@ defmodule ChatAgent.Tunnel.Provider.Ngrok do
 
   @impl true
   def authenticate do
-    case config()[:authtoken] do
+    # Looked for before anything is run, so an agent that is not installed is
+    # reported as exactly that. Left to the run, it arrives as an exit status
+    # wrapping a sentence from a shell, which reads like ngrok refused rather
+    # than like ngrok is absent.
+    case System.find_executable(executable()) do
       nil ->
-        # No token given, so the agent's stored one has to do. `config check`
-        # is what reports whether it has any.
-        run("#{executable()} config check")
+        {:error, {:executable_not_found, executable()}}
 
-      token ->
-        authenticate(token)
+      _path ->
+        case config()[:authtoken] do
+          # No token given, so the agent's stored one has to do. `config check`
+          # is what reports whether it has any.
+          nil -> run("#{executable()} config check")
+          token -> authenticate(token)
+        end
     end
   end
 

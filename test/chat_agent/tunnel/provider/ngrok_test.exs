@@ -25,10 +25,10 @@ defmodule ChatAgent.Tunnel.Provider.NgrokTest do
 
   describe "authenticate/0" do
     test "writes the configured authtoken to the agent" do
-      configure(authtoken: "2abcDEF_ghi-jkl")
+      configure(executable: "sh", authtoken: "2abcDEF_ghi-jkl")
 
       expect(CommanderMock, :run, fn command, options ->
-        assert command == "ngrok config add-authtoken 2abcDEF_ghi-jkl"
+        assert command == "sh config add-authtoken 2abcDEF_ghi-jkl"
         assert :sync in options
         {:ok, []}
       end)
@@ -37,10 +37,10 @@ defmodule ChatAgent.Tunnel.Provider.NgrokTest do
     end
 
     test "checks the agent's stored configuration when no token is given" do
-      configure([])
+      configure(executable: "sh")
 
       expect(CommanderMock, :run, fn command, _options ->
-        assert command == "ngrok config check"
+        assert command == "sh config check"
         {:ok, []}
       end)
 
@@ -48,24 +48,31 @@ defmodule ChatAgent.Tunnel.Provider.NgrokTest do
     end
 
     test "runs the configured executable rather than one found on the PATH" do
-      configure(executable: "/opt/homebrew/bin/ngrok")
+      configure(executable: "/bin/sh")
 
       expect(CommanderMock, :run, fn command, _options ->
-        assert command == "/opt/homebrew/bin/ngrok config check"
+        assert command == "/bin/sh config check"
         {:ok, []}
       end)
 
       assert :ok = Ngrok.authenticate()
     end
 
+    test "says the agent is missing, rather than what the failure looked like" do
+      configure(executable: "definitely-not-ngrok")
+
+      # Nothing is run: the agent is looked for first.
+      assert {:error, {:executable_not_found, "definitely-not-ngrok"}} = Ngrok.authenticate()
+    end
+
     test "refuses a token that is not one, rather than passing it to a shell" do
-      configure(authtoken: "token; rm -rf /")
+      configure(executable: "sh", authtoken: "token; rm -rf /")
 
       assert {:error, :invalid_authtoken} = Ngrok.authenticate()
     end
 
     test "reports what the agent failed with" do
-      configure([])
+      configure(executable: "sh")
 
       expect(CommanderMock, :run, fn _command, _options ->
         {:error, [exit_status: 256, stderr: ["authentication failed"]]}
@@ -76,7 +83,7 @@ defmodule ChatAgent.Tunnel.Provider.NgrokTest do
     end
 
     test "reports an answer it does not recognise as a failure" do
-      configure([])
+      configure(executable: "sh")
 
       expect(CommanderMock, :run, fn _command, _options -> :something_else end)
 

@@ -9,6 +9,7 @@ defmodule ChatAgentWeb.ChannelLive do
 
   use ChatAgentWeb, :live_view
 
+  alias ChatAgent.Assistant
   alias ChatAgent.Channel
   alias ChatAgent.Channel.Message
   alias ChatAgent.Tunnel
@@ -25,6 +26,7 @@ defmodule ChatAgentWeb.ChannelLive do
       if connected?(socket) do
         Enum.each(channels, fn {channel, _module} -> Channel.subscribe(channel) end)
         Tunnel.subscribe()
+        Assistant.subscribe()
         MapSet.new(channels, fn {channel, _module} -> channel end)
       else
         MapSet.new()
@@ -41,6 +43,7 @@ defmodule ChatAgentWeb.ChannelLive do
        end)
      )
      |> assign(:subscribed, subscribed)
+     |> assign(:sessions, Assistant.sessions())
      |> assign_tunnel()
      |> assign(:messages, Map.new(channels, fn {channel, _module} -> {channel, []} end))
      |> assign(
@@ -51,6 +54,8 @@ defmodule ChatAgentWeb.ChannelLive do
 
   @impl true
   def handle_info({:message, %Message{channel: channel} = message}, socket) do
+    message = Assistant.redact(message)
+
     {:noreply,
      update(socket, :messages, fn messages ->
        Map.update(messages, channel, [message], &Enum.take([message | &1], @max_messages))
@@ -62,6 +67,14 @@ defmodule ChatAgentWeb.ChannelLive do
   # not a key these can count on being there.
   def handle_info({:tunnel, %Tunnel.Status{} = status}, socket) do
     {:noreply, assign_tunnel(socket, status)}
+  end
+
+  def handle_info({:assistant, {:session_opened, session}}, socket) do
+    {:noreply, update(socket, :sessions, &Map.put(&1, session.key, session))}
+  end
+
+  def handle_info({:assistant, {:session_closed, key}}, socket) do
+    {:noreply, update(socket, :sessions, &Map.delete(&1, key))}
   end
 
   @impl true
@@ -130,7 +143,7 @@ defmodule ChatAgentWeb.ChannelLive do
         </p>
 
         <p :if={@tunnel.error} class="tunnel-error">
-          Last error: <code>{inspect(@tunnel.error)}</code>
+          {error_message(@tunnel.error)}
         </p>
 
         <p class="tunnel-callbacks-hint">
@@ -185,6 +198,49 @@ defmodule ChatAgentWeb.ChannelLive do
     """
   end
 
+  # The session answering the conversation this card would reply to, which is
+  # the one whose messages are on screen. A channel can hold several at once,
+  # and the one worth showing is the one being talked to.
+  defp session_on(sessions, channel, messages) do
+    case newest_inbound(messages[channel]) do
+      %Message{conversation: conversation} -> Map.get(sessions, {channel, conversation})
+      nil -> Enum.find_value(sessions, fn {{on, _}, session} -> on == channel && session end)
+    end
+  end
+
+  # "you" is what the facade calls a person at the dashboard; anything else is
+  # the assistant that wrote it, and saying "sent from this dashboard" for one
+  # of those would be a lie the reader cannot check.
+  defp sent_by(%Message{sender: "you"}), do: "sent from this dashboard"
+  defp sent_by(%Message{sender: sender}), do: "sent by #{sender}"
+
+  # Each assistant's own mark, so the badge is recognisable before it is read.
+  # Claude's is the burst it signs its own answers with; anything else gets a
+  # plain one until it brings its own.
+  attr :assistant, :atom, required: true
+
+  defp assistant_mark(%{assistant: :claude} = assigns) do
+    ~H"""
+    <svg class="session-mark" viewBox="0 0 46 32" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M9.9 21.3 19 16.2l.2-.4-.2-.3h-.5l-1.4-.1-5-.1-4.3-.2-4.2-.2-1-.2L2 13.4l.1-.6.8-.6 1.2.1 2.6.2 3.9.3 2.8.2 4.2.4h.7v-.3l-.2-.2-.2-.2-4.4-3-4.8-3.2-2.5-1.8L5 4.2l-.6-.8-.3-1.8L5.3.4 6.9.5l.4.1 1.6 1.2L12.3 5l4.6 3.4.7.6.3-.2v-.1L17.5 8 14.7 3 11.7-2l-1.3-2.2-.4-1.3a5 5 0 0 1-.2-1.5l1.3-1.8 1-.3 2.3.3.9.8 1.4 3.2 2.3 5 3.5 6.9.2.6h.3v-.3l.3-3.5.5-4.3.5-5.5.2-1.6.8-1.9 1.6-1 1.2.6.9 1.4-.1.9-.6 3.7-1.1 5.7-.7 3.8h.4l.5-.5 2-2.6 3.3-4.1 1.4-1.6 1.7-1.8 1.1-.9h2l1.5 2.2-.7 2.3-2.1 2.7-1.8 2.3-2.5 3.4-1.6 2.7.2.2h.4l5.4-1.1 2.9-.5 3.4-.6 1.6.7.2 1.5-.6 1.5-3.7.9-4.3.9-6.4 1.5-.1.1.1.2 2.9.3h1.2l3 .2 2.3.2 1 .7-.5 1.4-1 .5-1.7-.4-4-1-1.4-.3h-.2v.1l1.2 1.1 2.1 1.9 2.6 2.4.2.6-.4.5h-.4l-2.4-1.8-.9-.8-2.1-1.7h-.2v.2l.5.7 2.6 3.9.1 1.2-.2.4-.7.2-.7-.1-1.4-2-1.5-2.3-1.2-2h-.5l-.6 6.4-.3 3.3-.2.8-1 1-1-.8-.6-1.2.5-2.4.6-3.2.5-2.5.4-3.1.3-1v-.1h-.4l-3.4 4.7-5.2 7-4.1 4.4-1 .4-1.7-.9.2-1.6 1-1.4 5.7-7.3 3.4-4.5 2.2-2.6v-.4h-.2L8.6 26l-3.6 2.3-2 .2-.8-.8v-1.3l.4-.4 3.3-2.2Z"
+      />
+    </svg>
+    """
+  end
+
+  defp assistant_mark(assigns) do
+    ~H"""
+    <svg class="session-mark" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M12 3l1.9 5.3L19 10.2l-5.1 1.9L12 17.4l-1.9-5.3L5 10.2l5.1-1.9L12 3Zm6.5 9.5l.9 2.4 2.4.9-2.4.9-.9 2.4-.9-2.4-2.4-.9 2.4-.9.9-2.4Z"
+      />
+    </svg>
+    """
+  end
+
   # A lookup rather than a clause per state, so a state nobody wrote a label
   # for reads as unknown instead of crashing the page that reports it.
   @state_labels %{
@@ -196,6 +252,22 @@ defmodule ChatAgentWeb.ChannelLive do
   }
 
   defp tunnel_state_label(state), do: Map.get(@state_labels, state, "Unknown")
+
+  # What went wrong, said rather than inspected. A reason someone can act on
+  # reads as a sentence; anything else keeps its shape, since a tuple nobody
+  # wrote a sentence for is still better than no detail at all.
+  defp error_message({:executable_not_found, name}) do
+    "#{name} was not found on the PATH, so no tunnel can be opened."
+  end
+
+  defp error_message(:connect_timeout), do: "The agent did not report a URL in time."
+
+  defp error_message({:agent_exited, reason}) do
+    "The agent stopped: #{inspect(reason)}. Starting it again."
+  end
+
+  defp error_message(:registration_failed), do: "A channel could not be told where to call."
+  defp error_message(reason), do: "Last error: #{inspect(reason)}"
 
   defp provider_name(nil), do: "No agent"
   defp provider_name(provider), do: provider.name()
@@ -313,6 +385,16 @@ defmodule ChatAgentWeb.ChannelLive do
                 </div>
               </div>
               <div class="channel-meta">
+                <span
+                  :if={session = session_on(@sessions, channel, @messages)}
+                  class={["session-badge", "is-#{session.assistant}"]}
+                  title={"Answering #{session.key |> elem(1)} as #{session.assistant}"}
+                >
+                  <.assistant_mark assistant={session.assistant} />
+                  <span class="session-assistant">{session.assistant}</span>
+                  <span class="session-id">{session.id}</span>
+                </span>
+
                 <span class={["conn-badge", MapSet.member?(@subscribed, channel) && "is-live"]}>
                   <span class="conn-dot"></span>
                   {if MapSet.member?(@subscribed, channel), do: "Subscribed", else: "Connecting"}
@@ -336,7 +418,7 @@ defmodule ChatAgentWeb.ChannelLive do
                         <span class="message-id-value" title={value}>{value}</span>
                       </span>
                       <span :if={message.direction == :outbound} class="message-manual">
-                        sent from this dashboard
+                        {sent_by(message)}
                       </span>
                     </p>
                     <p class="message-text">{message.text}</p>

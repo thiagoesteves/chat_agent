@@ -1,0 +1,57 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Edit",
+      "Write",
+
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git fetch *)",
+      "Bash(git pull --ff-only *)",
+
+      "Bash(git switch -c bot/*)",
+      "Bash(git checkout -b bot/*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push -u origin bot/*)",
+      "Bash(git push origin bot/*)",
+
+      "Bash(gh pr create *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr diff *)",
+      "Bash(gh pr comment *)"
+    ],
+
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push origin main *)",
+      "Bash(git push origin master *)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean *)",
+      "Bash(git config *)",
+      "Bash(git remote *)",
+
+      "Bash(gh auth *)",
+      "Bash(gh repo delete *)",
+      "Bash(gh secret *)",
+      "Bash(gh workflow run *)",
+      "Bash(gh api *)",
+
+      "Bash(rm *)",
+      "Bash(curl *)",
+      "Bash(sudo *)",
+
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Edit(./.github/workflows/**)"
+    ]
+  }
+}

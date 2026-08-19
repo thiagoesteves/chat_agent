@@ -12,4 +12,8 @@ Mox.defmock(ChatAgent.CommanderMock, for: ChatAgent.Commander.Adapter)
 # be driven through every state without a tunnelling service.
 Mox.defmock(ChatAgent.TunnelProviderMock, for: ChatAgent.Tunnel.Provider.Adapter)
 
+# Mock for `ChatAgent.Assistant.Adapter`, so the router can be driven without
+# anything that answers for real.
+Mox.defmock(ChatAgent.AssistantMock, for: ChatAgent.Assistant.Adapter)
+
 ExUnit.start()

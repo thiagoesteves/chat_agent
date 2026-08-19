@@ -41,6 +41,28 @@ config :chat_agent, ChatAgent.Tunnel,
 # mock in tests, so nothing there reaches the machine.
 config :chat_agent, ChatAgent.Commander, adapter: ChatAgent.Commander.Local
 
+# Who can answer a person, and the rules the router follows. The password is
+# read from the environment in config/runtime.exs and has no default: with none
+# set, no conversation is answered at all.
+config :chat_agent, ChatAgent.Assistant,
+  default: :claude,
+  # Where sessions work. The root is the one place a conversation may pick from
+  # with `--work-dir`, so `--work-dir my-app-folder` means that and nothing else,
+  # and the default is a name under it for a conversation that picks nothing.
+  # Both are per machine: set them in config/<env>.override.exs, or from
+  # ASSISTANT_WORKING_DIR_ROOT and ASSISTANT_WORKING_DIR.
+  working_dir_root: nil,
+  working_dir: nil,
+  session_timeout: :timer.minutes(5),
+  history_limit: 20,
+  adapters: [
+    claude: ChatAgent.Assistant.Claude
+  ]
+
+config :chat_agent, ChatAgent.Assistant.Claude,
+  executable: "claude",
+  timeout: :timer.minutes(2)
+
 # Configure the endpoint
 config :chat_agent, ChatAgentWeb.Endpoint,
   url: [host: "localhost"],

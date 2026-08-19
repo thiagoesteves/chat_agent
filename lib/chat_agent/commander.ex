@@ -5,6 +5,8 @@ defmodule ChatAgent.Commander do
 
   @behaviour ChatAgent.Commander.Adapter
 
+  alias ChatAgent.Commander.Adapter
+
   ### ==========================================================================
   ### Callback function implementation
   ### ==========================================================================
@@ -14,7 +16,7 @@ defmodule ChatAgent.Commander do
   gen_server for supervision
   """
   @impl true
-  @spec run_link(command :: String.t(), options :: list()) ::
+  @spec run_link(command :: Adapter.command(), options :: list()) ::
           {:ok, any()} | {:ok, pid(), integer()} | {:error, any()}
   def run_link(command, options), do: default().run_link(command, options)
 
@@ -22,7 +24,7 @@ defmodule ChatAgent.Commander do
   Run the passed commands
   """
   @impl true
-  @spec run(command :: String.t(), options :: list()) ::
+  @spec run(command :: Adapter.command(), options :: list()) ::
           {:ok, any()} | {:ok, pid(), integer()} | {:error, any()}
   def run(command, options), do: default().run(command, options)
 
