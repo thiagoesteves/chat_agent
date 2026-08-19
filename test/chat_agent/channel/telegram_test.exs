@@ -136,9 +136,9 @@ defmodule ChatAgent.Channel.TelegramTest do
     end
 
     test "sets no secret token when none is configured" do
-      configured = Application.get_env(:chat_agent, :telegram_webhook_secret)
-      on_exit(fn -> Application.put_env(:chat_agent, :telegram_webhook_secret, configured) end)
-      Application.put_env(:chat_agent, :telegram_webhook_secret, nil)
+      configured = Application.get_env(:chat_agent, Telegram)
+      on_exit(fn -> Application.put_env(:chat_agent, Telegram, configured) end)
+      Application.put_env(:chat_agent, Telegram, Keyword.delete(configured, :webhook_secret))
 
       test_process = self()
 
@@ -240,11 +240,23 @@ defmodule ChatAgent.Channel.TelegramTest do
     end
 
     test "accepts any request when no secret is configured" do
-      configured = Application.get_env(:chat_agent, :telegram_webhook_secret)
-      on_exit(fn -> Application.put_env(:chat_agent, :telegram_webhook_secret, configured) end)
-      Application.put_env(:chat_agent, :telegram_webhook_secret, nil)
+      configured = Application.get_env(:chat_agent, Telegram)
+      on_exit(fn -> Application.put_env(:chat_agent, Telegram, configured) end)
+      Application.put_env(:chat_agent, Telegram, Keyword.delete(configured, :webhook_secret))
 
       assert :ok = Telegram.authenticate(conn(:post, "/telegram/webhook", ""))
+    end
+  end
+
+  describe "configuration" do
+    test "says what is missing, and where to set it, when the token is not configured" do
+      configured = Application.get_env(:chat_agent, Telegram)
+      on_exit(fn -> Application.put_env(:chat_agent, Telegram, configured) end)
+      Application.put_env(:chat_agent, Telegram, Keyword.delete(configured, :bot_token))
+
+      assert_raise RuntimeError, ~r/no bot_token configured for ChatAgent.Channel.Telegram/, fn ->
+        Telegram.send_message(123_456, "Hello")
+      end
     end
   end
 

@@ -23,12 +23,14 @@ config :phoenix,
 
 config :chat_agent, ChatAgent.Commander, adapter: ChatAgent.CommanderMock
 
-config :chat_agent,
-  whatsapp_verify_token: "test_verify_token",
-  whatsapp_access_token: "test_access_token",
-  whatsapp_phone_number_id: "123456789",
-  whatsapp_api_version: "v20.0",
-  whatsapp_req_options: [plug: {Req.Test, ChatAgent.Channel.Whatsapp}],
-  telegram_bot_token: "test_telegram_bot_token",
-  telegram_webhook_secret: "test_telegram_webhook_secret",
-  telegram_req_options: [plug: {Req.Test, ChatAgent.Channel.Telegram}]
+config :chat_agent, ChatAgent.Channel.Whatsapp,
+  verify_token: "test_verify_token",
+  access_token: "test_access_token",
+  phone_number_id: "123456789",
+  api_version: "v20.0",
+  req_options: [plug: {Req.Test, ChatAgent.Channel.Whatsapp}]
+
+config :chat_agent, ChatAgent.Channel.Telegram,
+  bot_token: "test_telegram_bot_token",
+  webhook_secret: "test_telegram_webhook_secret",
+  req_options: [plug: {Req.Test, ChatAgent.Channel.Telegram}]

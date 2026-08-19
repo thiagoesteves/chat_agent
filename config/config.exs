@@ -21,6 +21,11 @@ config :chat_agent, ChatAgent.Channel,
     whatsapp: ChatAgent.Channel.Whatsapp
   ]
 
+# Each channel reads its own configuration under its module name, the same way
+# a tunnel provider does. Only defaults live here: everything secret is read
+# from the environment in config/runtime.exs.
+config :chat_agent, ChatAgent.Channel.Whatsapp, api_version: "v20.0"
+
 # Public ingress. Without a provider no tunnel is run and the URL, if any,
 # comes from the `:url` key: that is how a deployment behind DNS runs, and
 # `TUNNEL_PROVIDER=ngrok` in config/runtime.exs is how a development machine
