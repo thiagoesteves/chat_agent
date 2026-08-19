@@ -39,3 +39,6 @@ chat_agent-*.tar
 /assets/node_modules/
 npm-debug.log
 
+# Local configuration overrides and individual secrets, per MIX_ENV.
+config/*.override.exs
+

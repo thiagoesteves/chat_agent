@@ -603,73 +603,137 @@ main:has(.page-wide) {
 /* Messages ---------------------------------------------------------------- */
 
 /* Each channel gets the chat colours of the app it speaks to, so a card is
- * recognisable at a glance. Only inbound messages exist here, so every bubble
- * is styled as an incoming one.
+ * recognisable at a glance, incoming and outgoing bubbles included.
+ *
+ * Each channel also carries the wallpaper of the service it speaks to, from
+ * priv/static/images.
+ *
+ * There is one file per channel per theme, named wallpaper-<channel>-<theme>,
+ * so nothing is tinted or inverted to stand in for artwork that is missing.
+ * A new channel sets --chat-image in its own palette block, in both themes.
  */
 .channel-body.is-whatsapp {
   --chat-bg: #efeae2;
   --bubble: #ffffff;
   --bubble-text: #111b21;
+  --chat-image: url("/images/wallpaper-whatsapp-light.png");
+  --bubble-out: #d9fdd3;
+  --bubble-out-text: #111b21;
   --bubble-meta: #667781;
   --bubble-sender: #027eb5;
+  --send: #25d366;
+  --send-text: #0b3d21;
 }
 
 .channel-body.is-telegram {
   --chat-bg: #dfe9f2;
   --bubble: #ffffff;
   --bubble-text: #0f1419;
+  --chat-image: url("/images/wallpaper-telegram-light.jpg");
+  --bubble-out: #effdde;
+  --bubble-out-text: #0f1419;
   --bubble-meta: #707579;
   --bubble-sender: #3390ec;
+  --send: #3390ec;
+  --send-text: #ffffff;
 }
 
 .channel-body {
   --chat-bg: var(--surface);
   --bubble: var(--surface-sunken);
   --bubble-text: var(--text);
+  --chat-image: none;
+  --bubble-out: var(--surface-sunken);
+  --bubble-out-text: var(--text);
   --bubble-meta: var(--text-muted);
   --bubble-sender: var(--accent);
+  --send: var(--accent);
+  --send-text: #ffffff;
 
   /* A short list should still read as a chat pane rather than a thin strip. */
   display: flex;
   flex-direction: column;
   min-height: 10rem;
   border-radius: 0 0 0.6875rem 0.6875rem;
-  background: var(--chat-bg);
+  position: relative;
+  background-color: var(--chat-bg);
   overflow: hidden;
 }
 
 @media (prefers-color-scheme: dark) {
   html:not([data-theme="light"]) .channel-body.is-whatsapp {
+    --send: #00a884;
+    --send-text: #0b141a;
     --chat-bg: #0b141a;
     --bubble: #202c33;
     --bubble-text: #e9edef;
+    --chat-image: url("/images/wallpaper-whatsapp-dark.jpg");
+  --bubble-out: #005c4b;
+    --bubble-out-text: #e9edef;
     --bubble-meta: #8696a0;
     --bubble-sender: #53bdeb;
   }
 
   html:not([data-theme="light"]) .channel-body.is-telegram {
+    --send: #4a9eea;
+    --send-text: #0e1621;
     --chat-bg: #0e1621;
     --bubble: #182533;
     --bubble-text: #e9edef;
+    --chat-image: url("/images/wallpaper-telegram-dark.jpg");
+  --bubble-out: #2b5278;
+    --bubble-out-text: #e9edef;
     --bubble-meta: #7d8b99;
     --bubble-sender: #6ab3f3;
   }
 }
 
 html[data-theme="dark"] .channel-body.is-whatsapp {
+  --send: #00a884;
+  --send-text: #0b141a;
   --chat-bg: #0b141a;
   --bubble: #202c33;
   --bubble-text: #e9edef;
+  --chat-image: url("/images/wallpaper-whatsapp-dark.jpg");
+  --bubble-out: #005c4b;
+  --bubble-out-text: #e9edef;
   --bubble-meta: #8696a0;
   --bubble-sender: #53bdeb;
 }
 
 html[data-theme="dark"] .channel-body.is-telegram {
+  --send: #4a9eea;
+  --send-text: #0e1621;
   --chat-bg: #0e1621;
   --bubble: #182533;
   --bubble-text: #e9edef;
+  --chat-image: url("/images/wallpaper-telegram-dark.jpg");
+  --bubble-out: #2b5278;
+  --bubble-out-text: #e9edef;
   --bubble-meta: #7d8b99;
   --bubble-sender: #6ab3f3;
+}
+
+/* The wallpaper is its own layer rather than a background on the pane, so the
+ * chat colour underneath still shows through wherever the artwork does not
+ * reach, and the bubbles keep their own stacking above it.
+ */
+.channel-body::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background-image: var(--chat-image);
+  background-size: 340px auto;
+  background-repeat: repeat;
+  pointer-events: none;
+}
+
+.message-list,
+.channel-empty,
+.message-form {
+  position: relative;
+  z-index: 1;
 }
 
 /* Newest at the bottom, the way a chat client reads.
@@ -699,6 +763,11 @@ html[data-theme="dark"] .channel-body.is-telegram {
   display: flex;
 }
 
+/* A reply sits on the right, the side a chat client puts your own messages on. */
+.message.is-outbound {
+  justify-content: flex-end;
+}
+
 .message-bubble {
   position: relative;
   max-width: min(85%, 44rem);
@@ -708,6 +777,25 @@ html[data-theme="dark"] .channel-body.is-telegram {
   background: var(--bubble);
   color: var(--bubble-text);
   box-shadow: 0 1px 0.5px rgb(0 0 0 / 0.13);
+}
+
+.message.is-outbound .message-bubble {
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.125rem;
+  background: var(--bubble-out);
+  color: var(--bubble-out-text);
+}
+
+.message-manual {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.3125rem;
+  border-radius: 0.25rem;
+  background: rgb(0 0 0 / 0.07);
+  color: var(--bubble-meta);
+  font-size: 0.625rem;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 .message-ids {
@@ -778,3 +866,98 @@ html[data-theme="dark"] .channel-body.is-telegram {
   color: var(--bubble-text);
 }
 
+/* Composer --------------------------------------------------------------- */
+
+.message-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem 0.75rem;
+  border-top: 1px solid rgb(0 0 0 / 0.08);
+  /* Transparent, so the conversation's wallpaper runs behind the composer too
+   * and the card reads as one surface rather than a pane plus a toolbar.
+   */
+  background: transparent;
+}
+
+.message-form-to {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.375rem;
+  margin: 0;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+
+.message-form-to-label {
+  color: var(--bubble-meta);
+}
+
+.message-form-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+/* The input arrives wrapped in a fieldset by the core component. */
+.message-form-row .fieldset {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.message-form-row input[type="text"] {
+  width: 100%;
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bubble);
+  color: var(--bubble-text);
+  font: inherit;
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.message-form-row input[type="text"]::placeholder {
+  color: var(--bubble-meta);
+}
+
+.message-form-row input[type="text"]:focus {
+  border-color: var(--send);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--send) 25%, transparent);
+}
+
+.message-form-row input[type="text"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.message-send {
+  flex: none;
+  height: 2.25rem;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--send);
+  color: var(--send-text);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.message-send:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.message-send:focus-visible {
+  outline: 2px solid var(--send);
+  outline-offset: 2px;
+}
+
+.message-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

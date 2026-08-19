@@ -19,10 +19,25 @@ defmodule ChatAgent.Channel.Message do
   rather than shown empty or filled in from somewhere else.
   `ChatAgent.Channel` stamps the `:channel` field when it broadcasts, so a
   channel module never has to know which key it was registered under.
+
+  `:direction` says which way the message went. An `:inbound` message is one a
+  channel received, and an `:outbound` one is a reply this app sent, which is
+  broadcast alongside the inbound ones so a conversation reads as a whole.
   """
 
   @enforce_keys [:sender, :conversation, :text, :received_at]
-  defstruct [:channel, :id, :sender, :conversation, :text, :received_at, identifiers: []]
+  defstruct [
+    :channel,
+    :id,
+    :sender,
+    :conversation,
+    :text,
+    :received_at,
+    direction: :inbound,
+    identifiers: []
+  ]
+
+  @type direction :: :inbound | :outbound
 
   @type t :: %__MODULE__{
           channel: atom() | nil,
@@ -31,6 +46,7 @@ defmodule ChatAgent.Channel.Message do
           conversation: String.t(),
           text: String.t(),
           received_at: DateTime.t(),
+          direction: direction(),
           identifiers: [{name :: String.t(), value :: String.t()}]
         }
 

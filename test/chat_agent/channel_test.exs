@@ -68,6 +68,35 @@ defmodule ChatAgent.ChannelTest do
       assert {:error, {:unknown_channel, :carrier_pigeon}} =
                Channel.send_message(:carrier_pigeon, "anyone", "Hello")
     end
+
+    test "tells subscribers about the reply it sent" do
+      stub_channel()
+      assert :ok = Channel.subscribe(:mock)
+
+      expect(ChatAgent.ChannelMock, :send_message, fn _recipient, _body -> :ok end)
+
+      assert :ok = Channel.send_message(:mock, 123_456, "On it")
+
+      assert_receive {:message, %Message{} = message}
+      assert message.direction == :outbound
+      assert message.channel == :mock
+      assert message.conversation == "123456"
+      assert message.text == "On it"
+      assert message.identifiers == [{"to", "123456"}]
+    end
+
+    test "says nothing to subscribers when the service refused it" do
+      stub_channel()
+      assert :ok = Channel.subscribe(:mock)
+
+      expect(ChatAgent.ChannelMock, :send_message, fn _recipient, _body ->
+        {:error, :undeliverable}
+      end)
+
+      assert {:error, :undeliverable} = Channel.send_message(:mock, "anyone", "Hello")
+
+      refute_receive {:message, _message}
+    end
   end
 
   describe "list/0" do

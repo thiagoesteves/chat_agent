@@ -94,8 +94,15 @@ defmodule ChatAgent.Channel do
           :ok | {:error, term()}
   def send_message(channel, recipient, body) do
     case adapter(channel) do
-      nil -> {:error, {:unknown_channel, channel}}
-      module -> module.send_message(recipient, body)
+      nil ->
+        {:error, {:unknown_channel, channel}}
+
+      module ->
+        with :ok <- module.send_message(recipient, body) do
+          # Subscribers see a reply the same way they see an inbound message, so
+          # a conversation reads as a whole and every open view stays in step.
+          broadcast(channel, sent_message(recipient, body))
+        end
     end
   end
 
@@ -140,6 +147,21 @@ defmodule ChatAgent.Channel do
 
   defp broadcast(channel, message) do
     Phoenix.PubSub.broadcast(@pubsub, topic(channel), {:message, %{message | channel: channel}})
+  end
+
+  # A service does not hand back a message when it accepts one, so the reply is
+  # described from what was asked of it. `sender` is this app rather than a
+  # person, and the conversation is where the reply went.
+  defp sent_message(recipient, body) do
+    recipient = to_string(recipient)
+
+    Message.new(
+      sender: "you",
+      conversation: recipient,
+      text: body,
+      direction: :outbound,
+      identifiers: [{"to", recipient}]
+    )
   end
 
   defp adapter(channel), do: Keyword.get(list(), channel)

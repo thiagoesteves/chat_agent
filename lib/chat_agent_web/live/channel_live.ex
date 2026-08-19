@@ -39,7 +39,11 @@ defmodule ChatAgentWeb.ChannelLive do
        end)
      )
      |> assign(:subscribed, subscribed)
-     |> assign(:messages, Map.new(channels, fn {channel, _module} -> {channel, []} end))}
+     |> assign(:messages, Map.new(channels, fn {channel, _module} -> {channel, []} end))
+     |> assign(
+       :forms,
+       Map.new(channels, fn {channel, _module} -> {channel, new_send_form(channel)} end)
+     )}
   end
 
   @impl true
@@ -48,6 +52,71 @@ defmodule ChatAgentWeb.ChannelLive do
      update(socket, :messages, fn messages ->
        Map.update(messages, channel, [message], &Enum.take([message | &1], @max_messages))
      end)}
+  end
+
+  @impl true
+  def handle_event("compose", %{"send" => %{"channel" => name, "body" => body}}, socket) do
+    # The composer's text is kept here rather than only in the browser, so that
+    # clearing it after a send is a change the server can actually push.
+    case channel_named(socket, name) do
+      nil -> {:noreply, socket}
+      channel -> {:noreply, put_form(socket, channel, body)}
+    end
+  end
+
+  def handle_event("send_message", %{"send" => %{"channel" => name, "body" => body}}, socket) do
+    # The channel comes from the form, the recipient from the conversation the
+    # newest message arrived on: a bot cannot open a conversation on either
+    # service, it can only answer one.
+    {:noreply, send_reply(socket, channel_named(socket, name), String.trim(body))}
+  end
+
+  defp send_reply(socket, nil, _body), do: put_flash(socket, :error, "Unknown channel")
+
+  defp send_reply(socket, channel, "") do
+    put_flash(socket, :error, "Nothing to send on #{channel}")
+  end
+
+  defp send_reply(socket, channel, body) do
+    case recipient(socket, channel) do
+      nil ->
+        put_flash(socket, :error, "No conversation on #{channel} to reply to yet")
+
+      recipient ->
+        deliver(socket, channel, recipient, body)
+    end
+  end
+
+  defp deliver(socket, channel, recipient, body) do
+    case Channel.send_message(channel, recipient, body) do
+      :ok ->
+        socket
+        |> put_flash(:info, "Sent on #{channel} to #{recipient}")
+        |> put_form(channel, "")
+
+      {:error, reason} ->
+        put_flash(socket, :error, "Could not send on #{channel}: #{inspect(reason)}")
+    end
+  end
+
+  defp channel_named(socket, name) do
+    Enum.find_value(socket.assigns.channels, fn {channel, _module} ->
+      to_string(channel) == name && channel
+    end)
+  end
+
+  defp recipient(socket, channel) do
+    case newest_inbound(socket.assigns.messages[channel]) do
+      %Message{conversation: conversation} -> conversation
+      nil -> nil
+    end
+  end
+
+  # A reply is addressed to whoever last wrote in, so replies this app already
+  # sent are skipped: answering our own message would say nothing about who is
+  # waiting for an answer.
+  defp newest_inbound(messages) do
+    Enum.find(messages || [], &(&1.direction == :inbound))
   end
 
   @impl true
@@ -97,12 +166,18 @@ defmodule ChatAgentWeb.ChannelLive do
 
             <div class={["channel-body", "is-#{channel}"]}>
               <ol :if={@messages[channel] != []} class="message-list">
-                <li :for={message <- @messages[channel]} class="message">
+                <li
+                  :for={message <- @messages[channel]}
+                  class={["message", "is-#{message.direction}"]}
+                >
                   <div class="message-bubble">
                     <p class="message-ids">
                       <span :for={{names, value} <- merge_repeats(message.identifiers)}>
                         <span class="message-id-name">{Enum.join(names, " · ")}</span>
                         <span class="message-id-value" title={value}>{value}</span>
+                      </span>
+                      <span :if={message.direction == :outbound} class="message-manual">
+                        sent from this dashboard
                       </span>
                     </p>
                     <p class="message-text">{message.text}</p>
@@ -116,6 +191,53 @@ defmodule ChatAgentWeb.ChannelLive do
               <p :if={@messages[channel] == []} class="channel-empty">
                 Waiting for messages on <code>{Channel.topic(channel)}</code>
               </p>
+
+              <.form
+                for={@forms[channel]}
+                phx-change="compose"
+                phx-submit="send_message"
+                id={"send-form-#{channel}"}
+                class="message-form"
+              >
+                <.input
+                  field={@forms[channel][:channel]}
+                  type="hidden"
+                  id={"send-#{channel}-channel"}
+                />
+
+                <p class="message-form-to">
+                  <%= if replying_to = newest_inbound(@messages[channel]) do %>
+                    <span class="message-form-to-label">Replying to</span>
+                    <span class="message-id-name">{conversation_field(replying_to)}</span>
+                    <span class="message-id-value">{replying_to.conversation}</span>
+                  <% else %>
+                    <span class="message-form-to-label">
+                      Nothing to reply to yet. A reply is addressed to the conversation a
+                      message arrived on.
+                    </span>
+                  <% end %>
+                </p>
+
+                <div class="message-form-row">
+                  <.input
+                    field={@forms[channel][:body]}
+                    type="text"
+                    placeholder={"Reply on #{channel}"}
+                    aria-label={"Reply on #{channel}"}
+                    autocomplete="off"
+                    id={"send-#{channel}-body"}
+                    disabled={newest_inbound(@messages[channel]) == nil}
+                  />
+                  <button
+                    type="submit"
+                    class="message-send"
+                    disabled={newest_inbound(@messages[channel]) == nil}
+                    phx-disable-with="Sending"
+                  >
+                    Send
+                  </button>
+                </div>
+              </.form>
             </div>
           </section>
         </div>
@@ -137,6 +259,23 @@ defmodule ChatAgentWeb.ChannelLive do
       nil -> merged ++ [{[name], value}]
       index -> List.update_at(merged, index, fn {names, seen} -> {names ++ [name], seen} end)
     end
+  end
+
+  # Name the field a reply is addressed to, using the channel's own vocabulary,
+  # so the composer and the messages above it agree on what the number is.
+  defp conversation_field(%Message{conversation: conversation, identifiers: identifiers}) do
+    case Enum.find(merge_repeats(identifiers), fn {_names, value} -> value == conversation end) do
+      {names, ^conversation} -> Enum.join(names, " · ")
+      nil -> "conversation"
+    end
+  end
+
+  defp put_form(socket, channel, body) do
+    update(socket, :forms, &Map.put(&1, channel, new_send_form(channel, body)))
+  end
+
+  defp new_send_form(channel, body \\ "") do
+    to_form(%{"channel" => to_string(channel), "body" => body}, as: "send")
   end
 
   attr :channel, :atom, required: true
