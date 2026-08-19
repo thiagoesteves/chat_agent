@@ -12,14 +12,6 @@ defmodule ChatAgentWeb.ChannelLiveTest do
     assert html =~ "ChatAgent.Channel.Telegram"
   end
 
-  test "shows an empty state naming the topic it waits on", %{conn: conn} do
-    {:ok, _view, html} = live(conn, ~p"/channels")
-
-    assert html =~ "Waiting for messages on"
-    assert html =~ "channel:whatsapp"
-    assert html =~ "channel:telegram"
-  end
-
   test "only subscribes once connected", %{conn: conn} do
     # The static render has no socket, so it reports that it is still connecting.
     html = conn |> get(~p"/channels") |> html_response(200)
@@ -347,6 +339,8 @@ defmodule ChatAgentWeb.ChannelLiveTest do
 
     whatsapp_card = view |> element("section.channel-card", "whatsapp") |> render()
     refute whatsapp_card =~ "Hello from Telegram"
-    assert whatsapp_card =~ "Waiting for messages"
+    # A channel nothing arrived on shows an empty pane, and says so with its
+    # own count rather than with a line of prose.
+    refute whatsapp_card =~ "message-bubble"
   end
 end

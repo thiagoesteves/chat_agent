@@ -120,6 +120,7 @@
   --text-muted: #666f7a;
   --accent: #4f46e5;
   --live: #16a34a;
+  --danger: #dc2626;
   --whatsapp: #25d366;
   --telegram: #29a9eb;
   --toggle-active: #ffffff;
@@ -137,6 +138,7 @@
     --text-muted: #a2abb5;
     --accent: #818cf8;
     --live: #4ade80;
+    --danger: #f87171;
     --toggle-active: #4b5661;
   }
 }
@@ -152,6 +154,7 @@ html[data-theme="dark"] .theme-toggle {
   --text-muted: #a2abb5;
   --accent: #818cf8;
   --live: #4ade80;
+  --danger: #f87171;
   --toggle-active: #4b5661;
 }
 
@@ -293,25 +296,239 @@ main:has(.page-wide) {
   padding-top: 2.5rem;
 }
 
-.channels-header {
-  margin-bottom: 1.5rem;
+/* Tunnel strip ------------------------------------------------------------ */
+
+/* Collapsed, this is one line above the grid: the messages are what the page
+ * is for, so the tunnel gets a line and a click, not a panel.
+ */
+.tunnel {
+  margin-bottom: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  background: var(--surface);
 }
 
-.channels-header h1 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
+.tunnel-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.625rem;
+  cursor: pointer;
+  list-style: none;
 }
 
-.channels-subtitle {
-  margin: 0.375rem 0 0;
-  max-width: 44rem;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  text-wrap: pretty;
+.tunnel-summary::-webkit-details-marker {
+  display: none;
+}
+
+.tunnel-summary:hover {
+  background: var(--surface-sunken);
+}
+
+.tunnel-summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* A chevron of its own, since the native marker cannot be aligned with the
+ * row it opens.
+ */
+.tunnel-chevron {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 1.5px solid var(--text-muted);
+  border-bottom: 1.5px solid var(--text-muted);
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+}
+
+.tunnel[open] .tunnel-chevron {
+  transform: rotate(45deg);
+}
+
+.tunnel-state {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.4375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.tunnel-state .conn-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.45;
+}
+
+.tunnel-state.is-connected {
+  color: var(--live);
+}
+
+.tunnel-state.is-connected .conn-dot {
+  opacity: 1;
+  animation: conn-pulse 2s ease-in-out infinite;
+}
+
+.tunnel-state.is-down {
+  color: var(--danger);
+}
+
+.tunnel-label {
+  flex: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.tunnel-summary-url {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 0.8125rem;
+  font-weight: 550;
+  color: var(--accent);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tunnel-summary-url:hover {
+  text-decoration: underline;
+}
+
+.tunnel-summary-pending {
+  flex: 1 1 auto;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.tunnel-body {
+  padding: 0.25rem 0.75rem 0.75rem;
+}
+
+.tunnel-provider,
+.tunnel-error,
+.tunnel-callbacks-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.tunnel-error {
+  color: var(--danger);
+}
+
+.callback-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.callback {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.4375rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface-sunken);
+}
+
+.callback-channel {
+  flex: none;
+  min-width: 5.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.callback-channel.is-whatsapp {
+  color: var(--whatsapp);
+}
+
+.callback-channel.is-telegram {
+  color: var(--telegram);
+}
+
+.callback-url {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.callback-url.is-partial {
+  color: var(--text-muted);
+}
+
+.callback-note,
+.callback-state {
+  flex: none;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.callback-state.is-ok {
+  color: var(--live);
+}
+
+.callback-state.is-error {
+  color: var(--danger);
+}
+
+.copy-button {
+  flex: none;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  background: var(--surface);
+  font-size: 0.6875rem;
+  font-weight: 550;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.copy-button:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.copy-button.is-copied {
+  color: var(--live);
+  border-color: var(--live);
+}
+
+@media (max-width: 640px) {
+  .callback {
+    flex-wrap: wrap;
+  }
+
+  .callback-url {
+    order: 3;
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tunnel-state.is-connected .conn-dot,
+  .tunnel-chevron,
+  .copy-button {
+    animation: none;
+    transition: none;
+  }
 }
 
 /* Subscription badge ------------------------------------------------------ */
@@ -650,10 +867,13 @@ main:has(.page-wide) {
   --send: var(--accent);
   --send-text: #ffffff;
 
-  /* A short list should still read as a chat pane rather than a thin strip. */
+  /* Tall enough to read as a chat pane while it fills: messages land at the
+   * top and stack downwards, and the pane only starts scrolling once they pass
+   * the list's own maximum.
+   */
   display: flex;
   flex-direction: column;
-  min-height: 10rem;
+  min-height: 24rem;
   border-radius: 0 0 0.6875rem 0.6875rem;
   position: relative;
   background-color: var(--chat-bg);
@@ -730,18 +950,18 @@ html[data-theme="dark"] .channel-body.is-telegram {
 }
 
 .message-list,
-.channel-empty,
-.message-form {
-  position: relative;
-  z-index: 1;
-}
 
 /* Newest at the bottom, the way a chat client reads.
  *
  * column-reverse does two jobs at once: the newest message, which is first in
  * the list, renders last, and the scroll container stays pinned to the bottom
- * as messages arrive without any JavaScript. In a reversed column flex-start
- * is the bottom, so a short list anchors there rather than floating at the top.
+ * as messages arrive without any JavaScript.
+ *
+ * In a reversed column the main axis runs upwards, so flex-end is the top:
+ * that is what makes the first messages sit at the top of an empty pane and
+ * grow downwards, instead of hanging off the bottom of it. Once they overflow,
+ * justify-content stops applying and the pane scrolls, still pinned to the
+ * newest.
  *
  * The trade is that DOM order stays newest first, so a screen reader hears the
  * newest message first while a sighted reader sees it last.
@@ -750,7 +970,7 @@ html[data-theme="dark"] .channel-body.is-telegram {
   display: flex;
   flex: 1;
   flex-direction: column-reverse;
-  justify-content: flex-start;
+  justify-content: flex-end;
   gap: 0.375rem;
   margin: 0;
   padding: 0.75rem;
@@ -848,27 +1068,16 @@ html[data-theme="dark"] .channel-body.is-telegram {
   color: var(--bubble-meta);
 }
 
-.channel-empty {
-  margin: auto;
-  padding: 2.5rem 1rem;
-  text-align: center;
-  font-size: 0.8125rem;
-  line-height: 1.6;
-  color: var(--bubble-meta);
-}
-
-.channel-empty code {
-  display: inline-block;
-  margin-top: 0.25rem;
-  padding: 0.125rem 0.375rem;
-  border-radius: 0.25rem;
-  background: var(--bubble);
-  color: var(--bubble-text);
-}
-
 /* Composer --------------------------------------------------------------- */
 
 .message-form {
+  /* Above the wallpaper, and always at the foot of the pane: the message list
+   * is only rendered once something has arrived, so on an empty channel this
+   * is the pane's only child and would otherwise sit at the top of it.
+   */
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
