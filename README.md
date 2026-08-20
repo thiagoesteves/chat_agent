@@ -8,6 +8,11 @@ Three pieces make that work, and each one is optional:
 - **A tunnel** gives the app a public URL on a development machine, so those webhooks have somewhere to arrive, and tells each service where that is.
 - **An assistant** answers an authenticated conversation by running the `claude` command line tool.
 
+![The dashboard: a tunnel connected, a Telegram conversation authenticated, and an assistant answering it](guides/static/chat_agent.png)
+
+The strip across the top is the public URL the chat services call.
+Each card is one channel, and the badge beside a channel's name is the session answering it: which assistant, and which session.
+
 > **This is not ready for production.**
 > See [Running it anywhere else](#running-it-anywhere-else) for what would have to change first.
 > Everything below assumes a development machine.
