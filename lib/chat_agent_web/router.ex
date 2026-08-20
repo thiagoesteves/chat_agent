@@ -63,13 +63,16 @@ defmodule ChatAgentWeb.Router do
   end
 
   ## Authentication routes
+  #
+  # There is no registration route. An account is created by the seed file or
+  # by hand, because this application answers a chat and runs a command line
+  # tool for whoever is signed in: an account is a grant, not a signup.
 
   scope "/", ChatAgentWeb do
     pipe_through [:browser]
 
     live_session :current_user,
       on_mount: [{ChatAgentWeb.UserAuth, :mount_current_scope}] do
-      live "/users/register", UserLive.Registration, :new
       live "/users/log-in", UserLive.Login, :new
       live "/users/log-in/:token", UserLive.Confirmation, :new
     end
