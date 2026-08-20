@@ -2,45 +2,58 @@
 #
 #     mix run priv/repo/seeds.exs
 #
-# Example configuration in config/config.exs or config/runtime.exs:
+# Each account is a map of exactly what an account needs, so a key that is
+# misspelled is a failure with a message rather than an account that silently
+# never appears:
+#
+#     config :chat_agent, :repo_seeds,
+#       default_user: %{email: "admin@example.com", password: "..."}
+#
+#     or, for more than one:
 #
 #     config :chat_agent, :repo_seeds,
 #       default_users: [
-#         [username: "admin", password: "pass"]
+#         %{email: "admin@example.com", password: "..."},
+#         %{email: "someone@example.com", password: "..."}
 #       ]
 #
-#     or for a single account:
-#
-#     config :chat_agent, :repo_seeds,
-#       default_user: [username: "admin", password: "pass"]
+# An empty map means no default account, which is the default: an account
+# everybody knows the password of is worse than no account at all.
 
 alias ChatAgent.Accounts.User
 alias ChatAgent.Repo
 
-repo_seeds =
-  :chat_agent
-  |> Application.get_env(:repo_seeds, [])
-  |> then(fn
-    list when is_list(list) -> list
-    _other -> []
-  end)
+seeds = Application.get_env(:chat_agent, :repo_seeds, [])
 
-default_users =
-  Keyword.get(repo_seeds, :default_users, []) ++
-    if user = Keyword.get(repo_seeds, :default_user), do: [user], else: []
+accounts =
+  case Keyword.get(seeds, :default_user) do
+    nil -> []
+    account -> [account]
+  end ++ Keyword.get(seeds, :default_users, [])
 
-for user <- default_users, user != [] and user != %{} do
-  email = Keyword.get(user, :email) || Keyword.get(user, :username)
-  password = Keyword.get(user, :password)
+for account <- accounts, account != %{} do
+  {email, password} =
+    case account do
+      %{email: email, password: password} when is_binary(email) and is_binary(password) ->
+        {email, password}
 
-  if is_binary(email) and is_binary(password) do
-    unless Repo.get_by(User, email: email) do
-      %User{
-        email: email,
-        hashed_password: Pbkdf2.hash_pwd_salt(password),
-        confirmed_at: DateTime.utc_now(:second)
-      }
-      |> Repo.insert!()
+      other ->
+        raise """
+        invalid :repo_seeds account: #{inspect(other)}
+
+        Each account is a map with an email and a password:
+
+            config :chat_agent, :repo_seeds,
+              default_user: %{email: "admin@example.com", password: "..."}
+        """
     end
+
+  unless Repo.get_by(User, email: email) do
+    %User{
+      email: email,
+      hashed_password: Pbkdf2.hash_pwd_salt(password),
+      confirmed_at: DateTime.utc_now(:second)
+    }
+    |> Repo.insert!()
   end
 end
