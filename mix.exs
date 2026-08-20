@@ -127,6 +127,12 @@ defmodule ChatAgent.MixProject do
         # out of the test suite.
         ChatAgent.Commander.Local,
         ChatAgentWeb.ConnCase,
+        ChatAgent.DataCase,
+        # Fixtures the generators write and the generators call: `:scopes` in
+        # config/config.exs names this module, so the next generated test uses
+        # what today's tests have not needed yet. Calling them from a test to
+        # raise a number would be testing the test helpers.
+        ChatAgent.AccountsFixtures,
         # `embed_templates` generates layout and error page functions, and cover
         # does not attribute execution back to them.
         ChatAgentWeb.CoreComponents,

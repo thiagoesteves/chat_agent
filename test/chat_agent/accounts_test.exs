@@ -161,6 +161,17 @@ defmodule ChatAgent.AccountsTest do
       assert Repo.get_by(UserToken, user_id: user.id)
     end
 
+    test "does not update email with a token that is not a token", %{user: user} do
+      # "oops" above is four base64 characters, so it decodes and then finds no
+      # token. This one cannot be decoded at all, which is the other way a
+      # token arrives wrong.
+      assert Accounts.update_user_email(user, "not a token!") ==
+               {:error, :transaction_aborted}
+
+      assert Repo.get!(User, user.id).email == user.email
+      assert Repo.get_by(UserToken, user_id: user.id)
+    end
+
     test "does not update email if user email changed", %{user: user, token: token} do
       assert Accounts.update_user_email(%{user | email: "current@example.com"}, token) ==
                {:error, :transaction_aborted}
