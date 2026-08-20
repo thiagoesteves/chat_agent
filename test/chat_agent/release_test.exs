@@ -2,6 +2,8 @@ defmodule ChatAgent.ReleaseTest do
   # Not async: migrating touches the one database every other test shares.
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureIO
+
   alias ChatAgent.Release
   alias ChatAgent.Repo
   alias Ecto.Adapters.SQL.Sandbox
@@ -55,8 +57,12 @@ defmodule ChatAgent.ReleaseTest do
     test "brings the database up to date, and stays quiet when it already is" do
       # A release that migrates twice, or migrates an already current database,
       # must not fail the second time: deployments repeat.
-      assert :ok = Release.migrate()
-      assert :ok = Release.migrate()
+      #
+      # The migrator loads the migration files, which the suite has already
+      # loaded, and the compiler says so on stderr. That belongs to running
+      # migrations twice in one VM rather than to anything under test.
+      assert {:ok, _said} = with_io(:stderr, fn -> Release.migrate() end)
+      assert {:ok, _said} = with_io(:stderr, fn -> Release.migrate() end)
     end
 
     test "takes a repository back, and forward again" do
@@ -65,12 +71,12 @@ defmodule ChatAgent.ReleaseTest do
         |> Path.wildcard()
         |> Enum.map(&(&1 |> Path.basename() |> String.split("_") |> hd() |> String.to_integer()))
 
-      assert :ok = Release.rollback(Repo, version)
+      assert {:ok, _said} = with_io(:stderr, fn -> Release.rollback(Repo, version) end)
       refute users_table?()
 
       # Going back is only useful if going forward again works, which is what a
       # release does after a bad deployment.
-      assert :ok = Release.migrate()
+      assert {:ok, _said} = with_io(:stderr, fn -> Release.migrate() end)
       assert users_table?()
     end
   end

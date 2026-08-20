@@ -4,6 +4,8 @@ defmodule ChatAgentWeb.ChannelLiveSessionTest do
   alias ChatAgent.Assistant
   alias ChatAgent.Channel
 
+  setup :register_and_log_in_user
+
   describe "the session badge" do
     test "shows nothing while no conversation is being answered", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/channels")

@@ -122,6 +122,14 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# The accounts the seed file creates, each an exact map of what an account
+# needs. Empty means none, which is the right default: an account whose
+# password ships in the repository is one everybody knows.
+#
+#     config :chat_agent, :repo_seeds,
+#       default_user: %{email: "admin@example.com", password: "..."}
+config :chat_agent, :repo_seeds, default_user: %{}
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
@@ -133,11 +141,3 @@ override_file = "#{config_env()}.override.exs"
 if File.exists?("config/#{override_file}") or File.exists?("../../config/#{override_file}") do
   import_config override_file
 end
-
-# The accounts the seed file creates, each an exact map of what an account
-# needs. Empty means none, which is the right default: an account whose
-# password ships in the repository is one everybody knows.
-#
-#     config :chat_agent, :repo_seeds,
-#       default_user: %{email: "admin@example.com", password: "..."}
-config :chat_agent, :repo_seeds, default_user: %{}
