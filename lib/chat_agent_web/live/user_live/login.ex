@@ -13,11 +13,7 @@ defmodule ChatAgentWeb.UserLive.Login do
               <%= if @current_scope do %>
                 You need to reauthenticate to perform sensitive actions on your account.
               <% else %>
-                Don't have an account? <.link
-                  navigate={~p"/users/register"}
-                  class="font-semibold text-brand hover:underline"
-                  phx-no-format
-                >Sign up</.link> for an account now.
+                Accounts are created by whoever runs this, not by signing up.
               <% end %>
             </:subtitle>
           </.header>

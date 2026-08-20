@@ -101,7 +101,7 @@ mix phx.server
 Sign in at [`/users/log-in`](http://localhost:4000/users/log-in) with the email and password you seeded.
 The dashboard is at [`/channels`](http://localhost:4000/channels).
 
-Registration exists at `/users/register`, but it sends a magic link by email and development has no mailbox to read it in, so seed the account instead.
+**There is no registration page.** An account is created by the seed file above, or by hand in `iex`, because signing in here grants a dashboard that reads every conversation and an assistant that runs a command line tool: an account is a grant, not a signup.
 
 ## A public URL
 
@@ -203,7 +203,7 @@ mix run priv/repo/seeds.exs    # seed the accounts named in configuration
 **This is not ready for production**, and the reasons are worth reading before deciding to try:
 
 - **The assistant runs a command line tool as whoever runs this application.** Anyone who knows the chat password gets whatever permissions you granted it. That is the feature, and it is also the whole security boundary.
-- **Registration is open and no mailer is configured.** Anyone who can reach `/users/register` can create an account, and magic links cannot be delivered, so logging in depends on seeded accounts.
+- **No mailer is configured.** Nothing that depends on email works, which today means the magic link login: sign in with the password of a seeded account.
 - **The database is a single SQLite file** with one writer. Fine for one machine, and not a story for more than one.
 - **Nothing rate limits an inbound webhook**, and a chat service will happily retry.
 

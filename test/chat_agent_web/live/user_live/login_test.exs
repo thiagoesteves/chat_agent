@@ -9,8 +9,11 @@ defmodule ChatAgentWeb.UserLive.LoginTest do
       {:ok, _lv, html} = live(conn, ~p"/users/log-in")
 
       assert html =~ "Log in"
-      assert html =~ "Sign up"
       assert html =~ "Log in and stay logged in"
+      # There is nowhere to sign up: an account is a grant, made by whoever
+      # runs this, not something a visitor gives themselves.
+      refute html =~ "Sign up"
+      assert html =~ "Accounts are created by whoever runs this"
     end
 
     # Login is by password only for now, so there is no email form to submit
@@ -56,16 +59,10 @@ defmodule ChatAgentWeb.UserLive.LoginTest do
   end
 
   describe "login navigation" do
-    test "redirects to registration page when the Register button is clicked", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
-
-      {:ok, _login_live, login_html} =
-        lv
-        |> element("main a", "Sign up")
-        |> render_click()
-        |> follow_redirect(conn, ~p"/users/register")
-
-      assert login_html =~ "Register"
+    test "offers nowhere to register, and answers nothing there" do
+      # The route is gone rather than hidden, so a link kept in a bookmark
+      # finds nothing.
+      assert get(build_conn(), "/users/register").status == 404
     end
   end
 

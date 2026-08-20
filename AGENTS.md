@@ -616,6 +616,10 @@ custom classes must fully style the input
 <!-- phoenix-gen-auth-start -->
 ## Authentication
 
+**There is no registration route.**
+An account is created by `priv/repo/seeds.exs` or by hand, because signing in grants a dashboard that reads every conversation and an assistant that runs a command line tool on this machine: an account is a grant rather than a signup.
+`ChatAgent.Accounts.register_user/1` remains, since that is what the seed file and the fixtures create users with; what was removed is the page that let a visitor call it.
+
 - **Always** handle authentication flow at the router level with proper redirects
 - **Always** be mindful of where to place routes. `phx.gen.auth` creates multiple router plugs and `live_session` scopes:
   - A plug `:fetch_current_scope_for_user` that is included in the default browser pipeline
