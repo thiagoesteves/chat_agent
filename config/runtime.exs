@@ -22,6 +22,18 @@ if whatsapp_api_version = System.get_env("WHATSAPP_API_VERSION") do
   config :chat_agent, ChatAgent.Channel.Whatsapp, api_version: whatsapp_api_version
 end
 
+# The conversations each channel will talk to, comma separated. Unset means
+# anyone who can find the bot.
+for {variable, channel} <- [
+      {"TELEGRAM_ALLOWED_CHAT_IDS", ChatAgent.Channel.Telegram},
+      {"WHATSAPP_ALLOWED_CHAT_IDS", ChatAgent.Channel.Whatsapp}
+    ] do
+  if allowed = System.get_env(variable) do
+    config :chat_agent, channel,
+      allowed_chat_ids: allowed |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
+  end
+end
+
 if telegram_bot_token = System.get_env("TELEGRAM_BOT_TOKEN") do
   config :chat_agent, ChatAgent.Channel.Telegram, bot_token: telegram_bot_token
 end

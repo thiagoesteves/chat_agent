@@ -51,9 +51,12 @@ import Config
 config :chat_agent, :repo_seeds,
   default_user: %{email: "you@example.com", password: "a-long-random-password"}
 
-# The Telegram bot you are running, from @BotFather.
+# The Telegram bot you are running, from @BotFather. The allow list decides
+# which conversations it answers at all: empty means anyone who finds the bot,
+# a list means those and no others, in both directions.
 config :chat_agent, ChatAgent.Channel.Telegram,
-  bot_token: "1234567890:AAFAKEfakeFAKEfakeFAKEfakeFAKEfake0"
+  bot_token: "1234567890:AAFAKEfakeFAKEfakeFAKEfakeFAKEfake0",
+  allowed_chat_ids: ["123456789"]
 
 # A public URL, so Telegram has somewhere to deliver to. Pick one provider.
 config :chat_agent, ChatAgent.Tunnel, provider: ChatAgent.Tunnel.Provider.Ngrok
