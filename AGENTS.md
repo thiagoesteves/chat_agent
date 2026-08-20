@@ -5,7 +5,7 @@
 ChatAgent is a Phoenix application that receives chat messages from external messaging services over webhooks and sends replies back to them.
 It currently speaks WhatsApp (Cloud API) and Telegram (Bot API).
 There is no database: inbound messages are handled in process and broadcast over PubSub, and a LiveView dashboard shows them arriving.
-Reaching those webhooks from the internet is `ChatAgent.Tunnel`'s job: in a deployment that is a DNS name, and on a development machine it is a tunnel agent (ngrok) run as an OS process.
+Reaching those webhooks from the internet is `ChatAgent.Tunnel`'s job: in a deployment that is a DNS name, and on a development machine it is a tunnel agent (ngrok or Pinggy) run as an OS process.
 
 Elixir requirement is `~> 1.19`.
 The exact toolchain is pinned in `.tool-versions` (Erlang 28.5.0.4, Elixir 1.19.5-otp-28).
@@ -42,6 +42,7 @@ lib/
       provider/
         adapter.ex          # behaviour every tunnel agent implements
         ngrok.ex            # ngrok agent, run and read over stdout
+        pinggy.ex           # Pinggy SSH agent, run and read over stdout
     application.ex
   chat_agent_web/
     controllers/            # webhook endpoints, one controller per service
@@ -105,7 +106,7 @@ A chat service delivers messages by calling a URL, so this app has to be reachab
 | Where it runs | Where the URL comes from |
 |---|---|
 | Deployment behind DNS | `PUBLIC_URL`, or the endpoint's own `PHX_HOST` in production |
-| Development machine | A tunnel agent, started when `TUNNEL_PROVIDER=ngrok` is set |
+| Development machine | A tunnel agent, started when `TUNNEL_PROVIDER=ngrok` or `TUNNEL_PROVIDER=pinggy` is set |
 
 Nothing else in the app knows which of the two it is running behind.
 They are alternatives rather than layers: a configured URL is already public, so `ChatAgent.Tunnel.enabled?/0` is false whenever one is set and no agent is started, which is what keeps the URL the app reports and the URL its webhooks point at the same one.
@@ -419,7 +420,7 @@ Rules for AI agents about which actions may run without asking and which require
 - `git push`, opening a PR, or any other action that leaves the local machine
 - Deleting files or changing permissions (`rm`, `chmod`)
 - Sending real requests to the WhatsApp or Telegram APIs with production credentials, which includes registering a webhook
-- Running a tunnel agent (`TUNNEL_PROVIDER=ngrok mix phx.server`, or `ngrok` directly), since it exposes the local machine publicly
+- Running a tunnel agent (`TUNNEL_PROVIDER=ngrok mix phx.server`, `TUNNEL_PROVIDER=pinggy mix phx.server`, or either agent directly), since it exposes the local machine publicly
 
 ---
 

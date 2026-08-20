@@ -5,8 +5,9 @@ defmodule ChatAgent.Tunnel do
   A chat service delivers its messages by calling a URL, which means this app
   has to be reachable from the internet before any channel works. In production
   that is a DNS name pointing at the deployment. On a development machine it is
-  not, so a tunnel agent (ngrok today, see `ChatAgent.Tunnel.Provider.Adapter`)
-  opens a public URL and forwards it to the local endpoint.
+  not, so a tunnel agent (ngrok or Pinggy, see
+  `ChatAgent.Tunnel.Provider.Adapter`) opens a public URL and forwards it to the
+  local endpoint.
 
   Both cases answer the same question, `url/0`, so nothing else in the app
   needs to know which one it is running behind:

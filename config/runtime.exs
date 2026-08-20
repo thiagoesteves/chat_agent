@@ -58,15 +58,17 @@ if claude_allowed_tools = System.get_env("CLAUDE_ALLOWED_TOOLS") do
       claude_allowed_tools |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
 end
 
-# Public ingress. Set TUNNEL_PROVIDER=ngrok on a development machine to open a
-# public URL for the chat services to call back on, which is what removes the
-# need for a DNS name there. A deployment that has one sets PUBLIC_URL instead,
-# or nothing at all: the production block below fills in its own host.
+# Public ingress. Set TUNNEL_PROVIDER=ngrok or TUNNEL_PROVIDER=pinggy on a
+# development machine to open a public URL for the chat services to call back
+# on, which is what removes the need for a DNS name there. A deployment that has
+# one sets PUBLIC_URL instead, or nothing at all: the production block below
+# fills in its own host.
 # Each key is set only when its variable is there, so this does not overwrite
 # what config/<env>.override.exs configured with a nil.
 tunnel_provider =
   case System.get_env("TUNNEL_PROVIDER") do
     "ngrok" -> ChatAgent.Tunnel.Provider.Ngrok
+    "pinggy" -> ChatAgent.Tunnel.Provider.Pinggy
     _none -> nil
   end
 
