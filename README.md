@@ -85,7 +85,10 @@ config :chat_agent, ChatAgent.Assistant,
 config :chat_agent, ChatAgent.Assistant.Claude,
   settings: "/Users/you/code/chat_agent/claude.settings.local.json",
   permission_mode: "acceptEdits",
-  disallowed_tools: ["Bash(rm:*)"]
+  disallowed_tools: ["Bash(rm:*)"],
+  # Where files sent to the bot are written, so the assistant may read them.
+  # Without this it is handed a path and refused by its own permissions.
+  add_dirs: ["/tmp/chat_agent/telegram"]
 ```
 
 Then seed the account and start the server:
@@ -117,6 +120,37 @@ The strip at the top of the dashboard shows the URL, the state of the tunnel, an
 | Pinggy | nothing to install beyond `ssh` | A free tunnel expires after an hour, and the app opens another; a token keeps one URL |
 
 Either way, `TUNNEL_PROVIDER=ngrok mix phx.server` works as well as configuring the provider in the override file.
+
+## Files sent to the bot
+
+A Telegram message carrying a file is downloaded, and the message becomes a description of what arrived: name, type, size, and the path it was written to.
+An assistant opens that path like any other file.
+
+```
+Telegram attachment downloaded.
+Name: invoice.pdf
+MIME type: application/pdf
+Size: 119653 bytes
+Local path: /tmp/chat_agent/telegram/1177-1d59ab4d63a3-invoice.pdf
+```
+
+Two settings decide whether that works, and missing the second is the confusing one:
+
+```elixir
+config :chat_agent, ChatAgent.Channel.Telegram,
+  download_dir: "/tmp/chat_agent/telegram"     # where files are written
+
+config :chat_agent, ChatAgent.Assistant.Claude,
+  add_dirs: ["/tmp/chat_agent/telegram"]       # what the assistant may read
+```
+
+Without the second, the assistant is handed a path and refused by its own permissions, and answers that nothing came through.
+Grant the download directory itself rather than the whole of `/tmp`, which would hand it every temporary file on the machine.
+
+A file is only fetched for a conversation on the channel's allow list, so nobody who merely found the bot can make it download anything.
+**Nothing removes old downloads**, so the directory grows until you clear it.
+
+Configuration lives in `config/dev.override.exs`, which is compile time: restart the server after changing it.
 
 ## Answering a conversation
 

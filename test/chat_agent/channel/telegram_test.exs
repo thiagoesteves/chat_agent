@@ -6,6 +6,26 @@ defmodule ChatAgent.Channel.TelegramTest do
   alias ChatAgent.Channel.Message
   alias ChatAgent.Channel.Telegram
 
+  setup do
+    configured = Application.get_env(:chat_agent, Telegram)
+
+    download_dir =
+      Path.join(System.tmp_dir!(), "telegram_test_#{System.unique_integer([:positive])}")
+
+    Application.put_env(
+      :chat_agent,
+      Telegram,
+      Keyword.put(configured, :download_dir, download_dir)
+    )
+
+    on_exit(fn ->
+      Application.put_env(:chat_agent, Telegram, configured)
+      File.rm_rf!(download_dir)
+    end)
+
+    %{download_dir: download_dir}
+  end
+
   describe "handle_message/1" do
     test "processes a text message" do
       # A private chat, where Telegram reports the same number for both: the
@@ -32,6 +52,315 @@ defmodule ChatAgent.Channel.TelegramTest do
 
       assert parsed.text == "Hello"
       assert %DateTime{} = parsed.received_at
+    end
+
+    test "answers a message it has nothing to show, rather than looping on it" do
+      # The clause that handles a chat message matches any message with a chat
+      # id, so falling back by calling this function again matched it again,
+      # and the webhook process spun forever.
+      for content <- [
+            %{"sticker" => %{"file_id" => "x"}},
+            %{"location" => %{"latitude" => 1, "longitude" => 2}},
+            %{"new_chat_members" => []},
+            %{"poll" => %{"question" => "?"}}
+          ] do
+        update = %{"update_id" => 9, "message" => Map.put(content, "chat", %{"id" => 123_456})}
+
+        task = Task.async(fn -> Telegram.handle_message(update) end)
+
+        assert {:ok, :ok} = Task.yield(task, 2_000) || Task.shutdown(task, :brutal_kill)
+      end
+    end
+
+    test "answers a payload shaped like nothing it knows, rather than raising" do
+      # A webhook that raises answers 500, and the sender retries for as long
+      # as it cares to. Anything can arrive here when no secret is configured.
+      for content <- [
+            %{"photo" => "not-a-list"},
+            %{"document" => "not-a-map"},
+            %{"photo" => []},
+            %{"audio" => nil}
+          ] do
+        update = %{"update_id" => 8, "message" => Map.put(content, "chat", %{"id" => 123_456})}
+
+        assert :ok = Telegram.handle_message(update)
+      end
+    end
+
+    test "fetches nothing for a conversation nobody listed", %{download_dir: download_dir} do
+      configured = Application.get_env(:chat_agent, Telegram)
+      on_exit(fn -> Application.put_env(:chat_agent, Telegram, configured) end)
+
+      Application.put_env(
+        :chat_agent,
+        Telegram,
+        Keyword.put(configured, :allowed_chat_ids, ["123456"])
+      )
+
+      update = %{
+        "update_id" => 11,
+        "message" => %{
+          "chat" => %{"id" => 999_999},
+          "document" => %{"file_id" => "file-1", "file_name" => "invoice.pdf"}
+        }
+      }
+
+      # Nothing is stubbed, so any request would raise rather than quietly
+      # succeed: a stranger cannot make this fetch and keep a file that the
+      # routing facade is about to drop anyway.
+      assert :ok = Telegram.handle_message(update)
+      refute File.exists?(download_dir)
+    end
+
+    test "keeps a caption from a conversation nobody listed, without the file" do
+      configured = Application.get_env(:chat_agent, Telegram)
+      on_exit(fn -> Application.put_env(:chat_agent, Telegram, configured) end)
+
+      Application.put_env(
+        :chat_agent,
+        Telegram,
+        Keyword.put(configured, :allowed_chat_ids, ["123456"])
+      )
+
+      update = %{
+        "update_id" => 12,
+        "message" => %{
+          "chat" => %{"id" => 999_999},
+          "caption" => "look at this",
+          "document" => %{"file_id" => "file-1", "file_name" => "invoice.pdf"}
+        }
+      }
+
+      # The facade drops it a moment later, and what it drops says what was
+      # said rather than nothing at all.
+      assert {:ok, %Message{text: "look at this"}} = Telegram.handle_message(update)
+    end
+
+    test "says a file could not be downloaded, rather than losing the message" do
+      for {stub, expected} <- [
+            {fn conn ->
+               Req.Test.json(conn, %{"ok" => false, "description" => "file is too big"})
+             end, "could not be downloaded"},
+            {fn conn -> Plug.Conn.send_resp(conn, 502, "Bad Gateway") end,
+             "could not be downloaded"},
+            {fn conn -> Req.Test.transport_error(conn, :econnrefused) end,
+             "could not be downloaded"}
+          ] do
+        Req.Test.stub(Telegram, stub)
+
+        update = %{
+          "update_id" => 14,
+          "message" => %{
+            "chat" => %{"id" => 123_456},
+            "caption" => "the invoice",
+            "document" => %{"file_id" => "file-1", "file_name" => "invoice.pdf"}
+          }
+        }
+
+        # What somebody said arrives either way: a download that failed is
+        # worth saying, and worth saying beside what it was sent with.
+        assert {:ok, %Message{text: text}} = Telegram.handle_message(update)
+        assert text =~ "the invoice"
+        assert text =~ expected
+      end
+    end
+
+    test "reports a download the network refused" do
+      Req.Test.stub(Telegram, fn conn ->
+        case conn.request_path do
+          "/bottest_telegram_bot_token/getFile" ->
+            Req.Test.json(conn, %{"ok" => true, "result" => %{"file_path" => "documents/a.pdf"}})
+
+          _file ->
+            Req.Test.transport_error(conn, :econnrefused)
+        end
+      end)
+
+      update = %{
+        "update_id" => 16,
+        "message" => %{
+          "chat" => %{"id" => 123_456},
+          "document" => %{"file_id" => "file-1", "file_name" => "a.pdf"}
+        }
+      }
+
+      assert {:ok, %Message{text: text}} = Telegram.handle_message(update)
+      assert text =~ "could not be downloaded"
+    end
+
+    test "reports a file the download itself refused", %{download_dir: download_dir} do
+      Req.Test.stub(Telegram, fn conn ->
+        case conn.request_path do
+          "/bottest_telegram_bot_token/getFile" ->
+            Req.Test.json(conn, %{"ok" => true, "result" => %{"file_path" => "documents/a.pdf"}})
+
+          _file ->
+            Plug.Conn.send_resp(conn, 404, "Not Found")
+        end
+      end)
+
+      update = %{
+        "update_id" => 15,
+        "message" => %{
+          "chat" => %{"id" => 123_456},
+          "document" => %{"file_id" => "file-1", "file_name" => "a.pdf"}
+        }
+      }
+
+      assert {:ok, %Message{text: text}} = Telegram.handle_message(update)
+      assert text =~ "could not be downloaded"
+      refute File.exists?(Path.join(download_dir, "a.pdf"))
+    end
+
+    test "keeps a file whatever its content type says it is", %{download_dir: download_dir} do
+      body = ~s({"invoice": 1})
+
+      Req.Test.stub(Telegram, fn conn ->
+        case conn.request_path do
+          "/bottest_telegram_bot_token/getFile" ->
+            Req.Test.json(conn, %{
+              "ok" => true,
+              "result" => %{"file_path" => "documents/report.json"}
+            })
+
+          _file ->
+            # Req decodes by content type, so without asking for the bytes a
+            # JSON attachment arrives as a map and a finished download reads
+            # as a failure.
+            conn
+            |> Plug.Conn.put_resp_content_type("application/json")
+            |> Plug.Conn.send_resp(200, body)
+        end
+      end)
+
+      update = %{
+        "update_id" => 13,
+        "message" => %{
+          "chat" => %{"id" => 123_456},
+          "document" => %{
+            "file_id" => "file-json",
+            "file_name" => "report.json",
+            "mime_type" => "application/json",
+            "file_size" => 999
+          }
+        }
+      }
+
+      assert {:ok, %Message{text: text}} = Telegram.handle_message(update)
+      assert text =~ "Telegram attachment downloaded."
+      refute text =~ "could not be downloaded"
+
+      [path] = Path.wildcard(Path.join(download_dir, "*report.json"))
+      assert File.read!(path) == body
+      # The size is what reached the disk, not what the payload claimed.
+      assert text =~ "Size: #{byte_size(body)} bytes"
+      refute text =~ "999"
+    end
+
+    test "downloads a document and gives the assistant its local path", %{
+      download_dir: download_dir
+    } do
+      Req.Test.stub(Telegram, fn conn ->
+        case conn.request_path do
+          "/bottest_telegram_bot_token/getFile" ->
+            Req.Test.json(conn, %{
+              "ok" => true,
+              "result" => %{"file_path" => "documents/report.xlsx"}
+            })
+
+          "/file/bottest_telegram_bot_token/documents/report.xlsx" ->
+            Plug.Conn.send_resp(conn, 200, "spreadsheet contents")
+        end
+      end)
+
+      update = %{
+        "update_id" => 4,
+        "message" => %{
+          "chat" => %{"id" => 123_456},
+          "from" => %{"id" => 123_456},
+          "caption" => "Please inspect this spreadsheet",
+          "document" => %{
+            "file_id" => "document-file-id",
+            "file_name" => "../../report.xlsx",
+            "mime_type" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "file_size" => 19
+          }
+        }
+      }
+
+      assert {:ok, %Message{text: text}} = Telegram.handle_message(update)
+      assert text =~ "Please inspect this spreadsheet"
+
+      assert text =~
+               "MIME type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+      assert [path] = Path.wildcard(Path.join(download_dir, "4-*"))
+      assert text =~ "Local path: #{path}"
+
+      digest =
+        :crypto.hash(:sha256, "document-file-id")
+        |> Base.encode16(case: :lower)
+        |> String.slice(0, 12)
+
+      assert Path.basename(path) == "4-#{digest}-report.xlsx"
+      assert File.read!(path) == "spreadsheet contents"
+    end
+
+    test "downloads the largest photo when a message has several sizes", %{
+      download_dir: download_dir
+    } do
+      Req.Test.stub(Telegram, fn conn ->
+        case conn.request_path do
+          "/bottest_telegram_bot_token/getFile" ->
+            Req.Test.json(conn, %{"ok" => true, "result" => %{"file_path" => "photos/image.jpg"}})
+
+          "/file/bottest_telegram_bot_token/photos/image.jpg" ->
+            Plug.Conn.send_resp(conn, 200, <<255, 216, 255, 217>>)
+        end
+      end)
+
+      update = %{
+        "update_id" => 5,
+        "message" => %{
+          "chat" => %{"id" => 123_456},
+          "photo" => [
+            %{"file_id" => "small-photo", "width" => 100, "height" => 100},
+            %{"file_id" => "large-photo", "width" => 1000, "height" => 1000}
+          ]
+        }
+      }
+
+      assert {:ok, %Message{text: text}} = Telegram.handle_message(update)
+
+      digest =
+        :crypto.hash(:sha256, "large-photo") |> Base.encode16(case: :lower) |> String.slice(0, 12)
+
+      path = Path.join(download_dir, "5-#{digest}-image.jpg")
+      assert text =~ "Local path: #{path}"
+      assert File.read!(path) == <<255, 216, 255, 217>>
+    end
+
+    test "keeps a message when Telegram cannot download its attachment" do
+      Req.Test.stub(Telegram, fn conn ->
+        Req.Test.json(conn, %{"ok" => false, "description" => "file is unavailable"})
+      end)
+
+      update = %{
+        "update_id" => 6,
+        "message" => %{
+          "chat" => %{"id" => 123_456},
+          "caption" => "The file is missing",
+          "document" => %{"file_id" => "missing-file", "file_name" => "missing.csv"}
+        }
+      }
+
+      assert {:ok, %Message{text: text}} = Telegram.handle_message(update)
+
+      assert text ==
+               Enum.join(
+                 ["The file is missing", "Telegram attachment could not be downloaded."],
+                 "\n\n"
+               )
     end
 
     test "separates the person from the conversation in a group" do

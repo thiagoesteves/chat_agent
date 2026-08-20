@@ -83,6 +83,10 @@ Controllers stay thin.
 Everything service specific lives in the channel module behind the behaviour, and the
 controller only turns its results into responses.
 
+Telegram documents, photos, audio, video, voice messages and animations are downloaded before the normalized message is broadcast.
+The message text includes the sanitized local path, MIME type and size so the assistant can inspect the file directly.
+Set `TELEGRAM_DOWNLOAD_DIR` to a directory the assistant can read, or include the default directory in Claude's `add_dirs` configuration.
+
 Every channel reads its own configuration under its own module name, the same way a tunnel provider does:
 
 ```elixir
@@ -96,7 +100,7 @@ A key belongs to exactly one channel, so nothing has to be prefixed to stay apar
 Defaults live in `config/config.exs`, secrets are read from the environment in `config/runtime.exs`, and each key there is set only when its variable is present, so a local `config/<env>.override.exs` is never overwritten with a nil.
 
 Runtime configuration comes from environment variables read in `config/runtime.exs`:
-`ASSISTANT_SALTED_PASSWORD`, `TELEGRAM_ALLOWED_CHAT_IDS`, `WHATSAPP_ALLOWED_CHAT_IDS`, `ASSISTANT_WORKING_DIR_ROOT`, `ASSISTANT_WORKING_DIR`, `CLAUDE_EXECUTABLE`, `CLAUDE_ALLOWED_TOOLS`, `PINGGY_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `HEALTHCHECK_LOGGING`, `TUNNEL_PROVIDER`, `PUBLIC_URL`, `NGROK_AUTHTOKEN`, `NGROK_DOMAIN`.
+`ASSISTANT_SALTED_PASSWORD`, `TELEGRAM_ALLOWED_CHAT_IDS`, `WHATSAPP_ALLOWED_CHAT_IDS`, `ASSISTANT_WORKING_DIR_ROOT`, `ASSISTANT_WORKING_DIR`, `CLAUDE_EXECUTABLE`, `CLAUDE_ALLOWED_TOOLS`, `PINGGY_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_DOWNLOAD_DIR`, `HEALTHCHECK_LOGGING`, `TUNNEL_PROVIDER`, `PUBLIC_URL`, `NGROK_AUTHTOKEN`, `NGROK_DOMAIN`.
 
 ### The public URL
 
@@ -335,6 +339,29 @@ The value is whatever identifies a conversation on that channel, a chat id for T
 A turned-away message is logged as `channel_message_ignored` with the conversation, which is how it gets added to the list when it should have been on it.
 
 The webhook still answers normally to the service, since a stranger learns nothing from a reply that says it was handled.
+
+### Attachments
+
+A Telegram message carrying a file is downloaded and the message becomes a description of it, including where it was written, so an assistant can open it.
+
+```elixir
+config :chat_agent, ChatAgent.Channel.Telegram,
+  download_dir: "/tmp/chat_agent/telegram"
+```
+
+Two things decide whether that actually works, and both are easy to get wrong:
+
+- **The allow list is asked before the download**, in the channel module rather than only in the facade. Otherwise a conversation nobody listed can make this fetch and keep twenty megabytes at a time, and nothing deletes what was fetched.
+- **An assistant can only read the file if the directory is one of its `add_dirs`.** The path is written into the message, so the assistant is told where the file is, and is then refused by its own permissions unless the directory was granted:
+
+```elixir
+config :chat_agent, ChatAgent.Assistant.Claude,
+  add_dirs: ["/tmp/chat_agent/telegram"]
+```
+
+The path is read when a file arrives rather than fixed at compile time, so a release uses the directory configured where it runs rather than the one the build machine had.
+
+Nothing removes old downloads.
 
 ### Request logging
 
