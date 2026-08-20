@@ -47,14 +47,27 @@ config :chat_agent, ChatAgent.Channel.Whatsapp, api_version: "v20.0"
 
 # Public ingress. Without a provider no tunnel is run and the URL, if any,
 # comes from the `:url` key: that is how a deployment behind DNS runs, and
-# `TUNNEL_PROVIDER=ngrok` in config/runtime.exs is how a development machine
-# gets a public URL without one. See `ChatAgent.Tunnel`.
+# `TUNNEL_PROVIDER=ngrok` or `TUNNEL_PROVIDER=pinggy` in config/runtime.exs is
+# how a development machine gets a public URL without one. See `ChatAgent.Tunnel`.
 config :chat_agent, ChatAgent.Tunnel,
   provider: nil,
   url: nil,
   port: nil,
   connect_timeout: :timer.seconds(30),
   max_backoff: :timer.minutes(1)
+
+config :chat_agent, ChatAgent.Tunnel.Provider.Pinggy,
+  executable: "ssh",
+  host: "free.pinggy.io",
+  ssh_port: 443,
+  # A token buys a tunnel that lasts and a name that stays, and Pinggy takes it
+  # as the SSH user. Set from PINGGY_ACCESS_TOKEN; without one the tunnel is
+  # anonymous and expires after an hour.
+  access_token: nil,
+  # Passed as `-o`, one per element, and what makes ssh usable with nobody at
+  # the keyboard.
+  ssh_options: ["StrictHostKeyChecking=no", "ServerAliveInterval=30"],
+  extra_args: []
 
 # Runs the operating system commands a tunnel provider needs. Swapped for a
 # mock in tests, so nothing there reaches the machine.
