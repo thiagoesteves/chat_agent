@@ -604,6 +604,14 @@ main:has(.page-wide) {
   }
 }
 
+/* A reply the service would not take. It is on screen and nowhere else, so it
+ * says so rather than looking like every other reply.
+ */
+.message-manual.is-undelivered {
+  color: var(--danger);
+  font-weight: 600;
+}
+
 /* Session badge ----------------------------------------------------------- */
 
 /* Sits beside the subscription badge: whether a channel is listening, and

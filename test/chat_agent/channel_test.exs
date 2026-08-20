@@ -88,7 +88,7 @@ defmodule ChatAgent.ChannelTest do
       assert message.identifiers == [{"to", "123456"}]
     end
 
-    test "says nothing to subscribers when the service refused it" do
+    test "tells subscribers about a reply the service would not take" do
       stub_channel()
       assert :ok = Channel.subscribe(:mock)
 
@@ -98,7 +98,12 @@ defmodule ChatAgent.ChannelTest do
 
       assert {:error, :undeliverable} = Channel.send_message(:mock, "anyone", "Hello")
 
-      refute_receive {:message, _message}
+      # A reply that reached nobody and appeared nowhere leaves two people
+      # looking at a conversation with a hole in it, so it is broadcast marked
+      # as what it is.
+      assert_receive {:message, %Message{direction: :outbound} = message}
+      assert message.text == "Hello"
+      assert {"delivery", "failed"} in message.identifiers
     end
   end
 
@@ -138,6 +143,49 @@ defmodule ChatAgent.ChannelTest do
     test "does not double the separator when the base URL ends in one" do
       assert Channel.webhook_url(:whatsapp, "https://example.com/") ==
                "https://example.com/whatsapp/webhook"
+    end
+  end
+
+  describe "a reply that could not be delivered" do
+    test "says why in the log, so the reason is somewhere" do
+      stub_channel()
+
+      expect(ChatAgent.ChannelMock, :send_message, fn _recipient, _body ->
+        {:error, %Req.TransportError{reason: :timeout}}
+      end)
+
+      Logger.configure(level: :info)
+      on_exit(fn -> Logger.configure(level: :warning) end)
+
+      log =
+        capture_log(fn ->
+          assert {:error, %Req.TransportError{}} = Channel.send_message(:mock, "123456", "Hello")
+        end)
+
+      # The screen says it failed; the log says what failed, which is the part
+      # nobody in the conversation can act on.
+      assert log =~ "channel_message_not_delivered"
+      assert log =~ "timeout"
+      assert log =~ "123456"
+    end
+
+    test "keeps whatever the sender said about itself" do
+      stub_channel()
+      assert :ok = Channel.subscribe(:mock)
+
+      expect(ChatAgent.ChannelMock, :send_message, fn _recipient, _body -> {:error, :nope} end)
+
+      Channel.send_message(:mock, "123456", "an answer",
+        sender: "claude",
+        identifiers: [{"session", "abc123"}]
+      )
+
+      assert_receive {:message, %Message{} = message}
+      # Who wrote it still travels with it, so the dashboard can say an
+      # assistant wrote this one and it never arrived.
+      assert message.sender == "claude"
+      assert {"session", "abc123"} in message.identifiers
+      assert {"delivery", "failed"} in message.identifiers
     end
   end
 

@@ -58,6 +58,10 @@ defmodule ChatAgent.Channel do
 
   @pubsub ChatAgent.PubSub
 
+  # What marks a reply the service would not take. It travels with the message,
+  # so anything showing a conversation can say so without asking why.
+  @undelivered [{"delivery", "failed"}]
+
   ### ==========================================================================
   ### Public functions
   ### ==========================================================================
@@ -233,13 +237,37 @@ defmodule ChatAgent.Channel do
   # to the conversations somebody named and to nobody else.
   defp send_to(channel, module, recipient, body, options) do
     if allowed?(channel, recipient) do
-      with :ok <- module.send_message(recipient, body) do
-        # Subscribers see a reply the same way they see an inbound message, so
-        # a conversation reads as a whole and every open view stays in step.
-        broadcast(channel, sent_message(recipient, body, options))
-      end
+      deliver(channel, module, recipient, body, options)
     else
       {:error, {:conversation_not_allowed, to_string(recipient)}}
+    end
+  end
+
+  # Subscribers see a reply the same way they see an inbound message, so a
+  # conversation reads as a whole and every open view stays in step.
+  #
+  # One that could not be delivered is broadcast too, marked as what it is. A
+  # reply that reaches nobody and appears nowhere leaves two people looking at
+  # a conversation with a hole in it: whoever was waiting for an answer, and
+  # whoever is watching the dashboard for one.
+  defp deliver(channel, module, recipient, body, options) do
+    case module.send_message(recipient, body) do
+      :ok ->
+        broadcast(channel, sent_message(recipient, body, options))
+
+      {:error, reason} ->
+        Logger.warning(%{
+          what: "channel_message_not_delivered",
+          channel: channel,
+          conversation: to_string(recipient),
+          reason: inspect(reason)
+        })
+
+        options = Keyword.update(options, :identifiers, @undelivered, &(&1 ++ @undelivered))
+
+        broadcast(channel, sent_message(recipient, body, options))
+
+        {:error, reason}
     end
   end
 

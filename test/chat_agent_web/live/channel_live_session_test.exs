@@ -3,6 +3,7 @@ defmodule ChatAgentWeb.ChannelLiveSessionTest do
 
   alias ChatAgent.Assistant
   alias ChatAgent.Channel
+  alias ChatAgent.Channel.Message
 
   setup :register_and_log_in_user
 
@@ -97,6 +98,38 @@ defmodule ChatAgentWeb.ChannelLiveSessionTest do
       assert html =~ "session-badge is-some_other"
       assert html =~ "some_other"
       assert html =~ "d4e5f6"
+    end
+  end
+
+  describe "a reply that never arrived" do
+    test "says so on the page, rather than looking like every other reply", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/channels")
+
+      # What the facade broadcasts when a channel would not take a reply.
+      Channel.subscribe(:telegram)
+
+      Phoenix.PubSub.broadcast(
+        ChatAgent.PubSub,
+        Channel.topic(:telegram),
+        {:message,
+         Message.new(
+           channel: :telegram,
+           conversation: "123456",
+           sender: "claude",
+           text: "an answer nobody received",
+           direction: :outbound,
+           identifiers: [{"session", "abc123"}, {"delivery", "failed"}]
+         )}
+      )
+
+      html = render(view)
+
+      assert html =~ "an answer nobody received"
+      assert html =~ "could not be delivered"
+      assert html =~ "is-undelivered"
+      # It did not arrive, so it does not claim an author the way a delivered
+      # one does.
+      refute html =~ "sent by claude"
     end
   end
 
