@@ -51,7 +51,14 @@ config :chat_agent, ChatAgent.Channel.Whatsapp, api_version: "v20.0"
 # channel: a chat id for Telegram, a phone number for WhatsApp. Set them per
 # machine in config/<env>.override.exs, or from TELEGRAM_ALLOWED_CHAT_IDS and
 # WHATSAPP_ALLOWED_CHAT_IDS.
-config :chat_agent, ChatAgent.Channel.Telegram, allowed_chat_ids: []
+config :chat_agent, ChatAgent.Channel.Telegram,
+  allowed_chat_ids: [],
+  # Where an attachment is written. Decided when it is used rather than when
+  # this file is compiled, so a release does not carry the build machine's
+  # temporary directory. An assistant can only read it if this is one of its
+  # `add_dirs`, so it is a path worth naming rather than one worth guessing.
+  download_dir: "/tmp/chat_agent/telegram"
+
 config :chat_agent, ChatAgent.Channel.Whatsapp, allowed_chat_ids: []
 
 # Public ingress. Without a provider no tunnel is run and the URL, if any,

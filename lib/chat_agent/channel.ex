@@ -134,8 +134,18 @@ defmodule ChatAgent.Channel do
       true
   """
   @spec allowed?(channel :: channel(), conversation :: Adapter.recipient()) :: boolean()
-  def allowed?(channel, conversation) do
-    case allowed_chat_ids(channel) do
+  def allowed?(channel, conversation), do: allowed_for?(adapter(channel), conversation)
+
+  @doc """
+  The same question asked by a channel about itself.
+
+  A channel module that has work to do before it returns a message, such as
+  fetching an attachment, asks this first: the list is otherwise applied to
+  what it hands back, which is after the work is done.
+  """
+  @spec allowed_for?(module :: module(), conversation :: Adapter.recipient()) :: boolean()
+  def allowed_for?(module, conversation) do
+    case allowed_chat_ids(module) do
       [] -> true
       allowed -> to_string(conversation) in allowed
     end
@@ -254,8 +264,8 @@ defmodule ChatAgent.Channel do
 
   # Configuration set to nil is configuration all the same, so the default is
   # applied to what comes back rather than to what was asked for.
-  defp allowed_chat_ids(channel) do
-    (Application.get_env(:chat_agent, adapter(channel)) || [])
+  defp allowed_chat_ids(module) do
+    (Application.get_env(:chat_agent, module) || [])
     |> Keyword.get(:allowed_chat_ids, [])
     |> Enum.map(&to_string/1)
   end

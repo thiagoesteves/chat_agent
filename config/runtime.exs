@@ -42,6 +42,10 @@ if telegram_webhook_secret = System.get_env("TELEGRAM_WEBHOOK_SECRET") do
   config :chat_agent, ChatAgent.Channel.Telegram, webhook_secret: telegram_webhook_secret
 end
 
+if telegram_download_dir = System.get_env("TELEGRAM_DOWNLOAD_DIR") do
+  config :chat_agent, ChatAgent.Channel.Telegram, download_dir: telegram_download_dir
+end
+
 # What a conversation's password is checked against, hashed and salted rather
 # than written down, so that reading the configuration gives nobody a way in:
 #
