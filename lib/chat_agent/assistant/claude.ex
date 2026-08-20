@@ -2,8 +2,10 @@ defmodule ChatAgent.Assistant.Claude do
   @moduledoc """
   Assistant backed by the `claude` command line tool.
 
-  Runs the executable through `ChatAgent.Commander`, so a test swaps the whole
-  operating system for a mock and no test ever runs the real thing.
+  Runs the executable through `ChatAgent.Commander.Runner`, which gives the run
+  a process of its own and answers with what it said, and which reaches the
+  operating system through `ChatAgent.Commander`, so a test swaps the whole
+  thing for a mock and no test ever runs the real one.
 
   Where it runs is the session's to decide and arrives with each call, since a
   conversation may say where it wants work done. See
@@ -65,7 +67,7 @@ defmodule ChatAgent.Assistant.Claude do
 
   @behaviour ChatAgent.Assistant.Adapter
 
-  alias ChatAgent.Commander
+  alias ChatAgent.Commander.Runner
 
   require Logger
 
@@ -103,46 +105,27 @@ defmodule ChatAgent.Assistant.Claude do
 
   # `-p` prints one reply and exits, rather than opening a session.
   #
-  # Watched rather than run synchronously: erlexec's own timeout bounds
-  # starting a process, not running one, so a tool that hangs would be waited
-  # on for as long as it hangs. Watching it means holding the process id, which
-  # is what makes a deadline enforceable.
+  # Run through `ChatAgent.Commander.Runner`, which gives the run a process of
+  # its own and holds the deadline there: erlexec's own timeout bounds starting
+  # a process, not running one, so a tool that hangs would otherwise be waited
+  # on for as long as it hangs. Waiting for it here would mean waiting for the
+  # run's messages in the session's mailbox, which is not this module's to
+  # occupy.
   defp run(executable, prompt, options) do
     Logger.info(%{what: "claude_request", prompt_length: String.length(prompt)})
 
     command = [executable] ++ arguments() ++ ["-p", prompt]
-    run_options = [:stdout, {:stderr, :stdout}, :monitor] ++ working_dir(options)
+    run_options = [{:timeout, timeout()} | working_dir(options)]
 
-    case Commander.run(command, run_options) do
-      {:ok, _pid, os_pid} -> collect(os_pid, System.monotonic_time(:millisecond) + timeout(), [])
-      {:error, reason} -> {:error, reason}
-      other -> {:error, other}
-    end
-  end
-
-  # stderr is folded into stdout by the options above, so everything the tool
-  # said arrives as one stream, in the order it said it.
-  defp collect(os_pid, deadline, output) do
-    receive do
-      {:stdout, ^os_pid, chunk} ->
-        collect(os_pid, deadline, [chunk | output])
-
-      {:DOWN, ^os_pid, :process, _pid, :normal} ->
+    case Runner.run(command, run_options) do
+      {:ok, output} ->
         {:ok, said(output)}
 
-      {:DOWN, ^os_pid, :process, _pid, {:exit_status, status}} ->
+      {:error, {:exit_status, status, output}} ->
         {:error, {:command_failed, failure(output, status)}}
 
-      {:DOWN, ^os_pid, :process, _pid, reason} ->
+      {:error, reason} ->
         {:error, reason}
-    after
-      max(deadline - System.monotonic_time(:millisecond), 0) ->
-        # Nothing else will stop it: erlexec kills a run whose owner dies only
-        # when the two were linked, and this one is watched rather than linked
-        # so that a tool exiting non-zero is a result rather than an exit.
-        Commander.stop(os_pid)
-
-        {:error, :timeout}
     end
   end
 
@@ -183,7 +166,9 @@ defmodule ChatAgent.Assistant.Claude do
     end
   end
 
-  defp said(output), do: output |> Enum.reverse() |> Enum.join() |> String.trim()
+  # What the tool printed, without the newline it ends its reply with: this is
+  # going into a chat message rather than onto a terminal.
+  defp said(output), do: String.trim(output)
 
   # What the tool said, if it said anything, and otherwise how it ended.
   defp failure(output, status) do

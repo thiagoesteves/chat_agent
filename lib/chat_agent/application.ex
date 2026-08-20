@@ -15,6 +15,10 @@ defmodule ChatAgent.Application do
         {DNSCluster, query: Application.get_env(:chat_agent, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: ChatAgent.PubSub},
         ChatAgent.Repo,
+        # Every command run for its output gets a process of its own, started
+        # here, so a run belongs to the supervision tree rather than to
+        # whoever asked for it.
+        {DynamicSupervisor, name: ChatAgent.Commander.RunnerSupervisor, strategy: :one_for_one},
         # Start to serve requests, typically the last entry
         ChatAgentWeb.Endpoint
       ] ++ assistant() ++ tunnel()

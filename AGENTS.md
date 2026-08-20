@@ -27,6 +27,7 @@ lib/
     commander/
       adapter.ex            # behaviour the OS binding implements
       local.ex              # erlexec binding, the only implementation
+      runner.ex             # one command, in a process of its own
     assistant.ex            # ChatAgent.Assistant, the facade over what answers
     assistant/
       adapter.ex            # behaviour every assistant implements
@@ -193,6 +194,7 @@ The router is what holds the protections, and each one exists for a reason worth
 | Each conversation is its own process | One slow answer would otherwise stop every other conversation from being answered |
 | Everything shown, stored or logged goes through `ChatAgent.Assistant.redact/1` | A password typed into a chat would otherwise be readable off the dashboard, out of the logs, and out of every prompt after it |
 | The assistant holds its own deadline and stops what it started | erlexec's own timeout bounds starting a process, not running one, so a tool that hangs would be waited on for as long as it hangs |
+| The run happens in a process of its own, not in the session's | A command's output arrives as messages, and reading them in the session would put another process's protocol in its mailbox |
 
 A session says so when it opens and when it closes, on the `"assistant"` topic, which is how the dashboard shows which conversation is being answered and by what without asking anything.
 Its identifier travels with every reply it sends, through `ChatAgent.Channel.send_message/4`'s `:sender` and `:identifiers` options: a reply written by an assistant says so, and only one typed at the dashboard says it came from there.
@@ -292,6 +294,21 @@ Everything that leaves the BEAM for the operating system goes through `ChatAgent
 A command is either a string, which a shell reads, or a list of an executable and its arguments, which no shell sees.
 Anything carrying text from a stranger must use the list form: a prompt typed into a chat would otherwise have its punctuation read as syntax.
 `ChatAgent.Assistant.Claude` uses the list form for exactly that reason, and the tunnel provider uses a string because the command line is its own.
+
+**A command run for its output runs in a process of its own**, through `ChatAgent.Commander.Runner`.
+Output arrives as messages, the run ends as another, and a deadline has to be held while both are outstanding: that is a protocol, and it belongs to a process that has nothing else to do.
+Waiting for it inside a `GenServer` means the server answers nothing until the command is over, every other message queues behind it, and whatever the run says afterwards is left in a mailbox that is not its own.
+
+    {:ok, output}                             # it finished, and this is everything it said
+    {:error, {:exit_status, status, output}}  # it ran and failed
+    {:error, :timeout}                        # it overran, and was stopped
+    {:error, reason}                          # it never started, or ended some other way
+
+The caller still waits, in a `GenServer.call/3`, because it asked for an answer.
+What it no longer does is hold the run's messages.
+Runs are started under `ChatAgent.Commander.RunnerSupervisor`, which the application starts, so a run belongs to the supervision tree rather than to whoever asked for it; the runner links to the command and monitors the caller, so neither outlives the other.
+
+A run that is watched instead of read, such as the tunnel agent, is not this: it stays a `handle_info` in the state machine that owns it, since there is no single answer to wait for.
 
 **Look for an executable before running it.**
 `System.find_executable/1` first, and `{:error, {:executable_not_found, name}}` when it is not there.
@@ -422,6 +439,9 @@ With `setup :verify_on_exit!` and no expectation declared, any call to the mock 
 That is how "a statuses-only webhook change reaches no channel" and "a request with an invalid secret reaches no channel" are asserted.
 
 A test that overrides application configuration must be `async: false`, since that configuration is global.
+
+A test whose subject runs the mock from another process needs `set_mox_global`, which is every test of something that runs a command: `ChatAgent.Commander.Runner` and `ChatAgent.Assistant.Claude` both answer from a runner process rather than from the test's.
+Drive a runner with the messages erlexec would send it (`{:stdout, os_pid, chunk}`, `{:EXIT, exec_pid, reason}`), sent from inside the mocked `run_link/2` so they are in its mailbox before the test is told the command ran.
 
 `ChatAgent.Tunnel.Server` does its work from its own process, so its test uses `set_mox_global`, and the mocked `run_link` returns a process it spawned with `spawn_link`, which leaves the fake agent linked to the state machine exactly as erlexec would.
 Drive it with the messages it actually receives (`{:stdout, os_pid, chunk}`, killing the linked process) and wait on the mock calls rather than on a broadcast, since a broadcast can be sent before the call the test is verifying.

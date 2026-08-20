@@ -6,6 +6,9 @@ defmodule ChatAgent.Assistant.ClaudeTest do
   alias ChatAgent.Assistant.Claude
   alias ChatAgent.CommanderMock
 
+  # The run happens in a process of its own, so the mock has to answer calls
+  # from any process rather than only from this one.
+  setup :set_mox_global
   setup :verify_on_exit!
 
   setup do
@@ -19,25 +22,26 @@ defmodule ChatAgent.Assistant.ClaudeTest do
     :ok
   end
 
-  # Stands in for erlexec: the mock answers as `run/2` does, and the messages a
-  # watched process would send arrive from here, in this process, which is
-  # where the adapter is waiting for them.
+  # Stands in for erlexec: the mock answers as `run_link/2` does, and the
+  # messages a linked run would send arrive from here, in the runner's own
+  # process, which is where they are read. The command it was given is
+  # forwarded to the test, which is what the assertions are about.
   defp expect_run(messages, os_pid \\ 4242) do
     test_process = self()
 
-    expect(CommanderMock, :run, fn command, options ->
+    expect(CommanderMock, :run_link, fn command, options ->
       send(test_process, {:ran, command, options})
-      Enum.each(messages, fn message -> send(test_process, message.(os_pid)) end)
 
-      {:ok, self(), os_pid}
+      runner = self()
+      Enum.each(messages, fn message -> send(runner, message.(os_pid, runner)) end)
+
+      {:ok, runner, os_pid}
     end)
   end
 
-  defp stdout(chunk), do: fn os_pid -> {:stdout, os_pid, chunk} end
-  defp finished, do: fn os_pid -> {:DOWN, os_pid, :process, self(), :normal} end
-
-  defp exited(status),
-    do: fn os_pid -> {:DOWN, os_pid, :process, self(), {:exit_status, status}} end
+  defp stdout(chunk), do: fn os_pid, _runner -> {:stdout, os_pid, chunk} end
+  defp finished, do: fn _os_pid, runner -> {:EXIT, runner, :normal} end
+  defp exited(status), do: fn _os_pid, runner -> {:EXIT, runner, {:exit_status, status}} end
 
   describe "send_message/2" do
     test "runs the tool with the prompt, and returns what it printed" do
@@ -49,8 +53,7 @@ defmodule ChatAgent.Assistant.ClaudeTest do
       # An argument list, not a command line: no shell reads the prompt.
       assert [executable, "-p", "How are you?"] = command
       assert String.ends_with?(executable, "/sh")
-      # Watched, so the run has a process id this can stop when it overruns.
-      assert :monitor in options
+      # Everything the tool said arrives as one stream, in the order it said it.
       assert {:stderr, :stdout} in options
     end
 
@@ -97,7 +100,7 @@ defmodule ChatAgent.Assistant.ClaudeTest do
     end
 
     test "reports a run that ended some other way" do
-      expect_run([fn os_pid -> {:DOWN, os_pid, :process, self(), :noproc} end])
+      expect_run([fn _os_pid, runner -> {:EXIT, runner, :noproc} end])
 
       assert {:error, :noproc} = Claude.send_message("123456", "hi")
     end
@@ -107,7 +110,7 @@ defmodule ChatAgent.Assistant.ClaudeTest do
       test_process = self()
 
       # Never says anything, and never finishes.
-      expect(CommanderMock, :run, fn _command, _options -> {:ok, self(), 4242} end)
+      expect(CommanderMock, :run_link, fn _command, _options -> {:ok, self(), 4242} end)
 
       expect(CommanderMock, :stop, fn os_pid ->
         send(test_process, {:stopped, os_pid})
@@ -227,13 +230,13 @@ defmodule ChatAgent.Assistant.ClaudeTest do
     end
 
     test "passes anything else it is told straight back" do
-      expect(CommanderMock, :run, fn _command, _options -> {:error, :enoent} end)
+      expect(CommanderMock, :run_link, fn _command, _options -> {:error, :enoent} end)
 
       assert {:error, :enoent} = Claude.send_message("123456", "hi")
     end
 
     test "reports an answer it does not recognise as a failure" do
-      expect(CommanderMock, :run, fn _command, _options -> :something_else end)
+      expect(CommanderMock, :run_link, fn _command, _options -> :something_else end)
 
       assert {:error, :something_else} = Claude.send_message("123456", "hi")
     end
