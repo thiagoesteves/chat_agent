@@ -53,7 +53,10 @@ defmodule ChatAgentWeb.Layouts do
         <span class="app-brand-name">ChatBot</span>
       </a>
 
-      <.theme_toggle />
+      <div class="app-bar-actions">
+        <.user_menu current_scope={@current_scope} />
+        <.theme_toggle />
+      </div>
     </header>
 
     <main class="px-4 py-20 sm:px-6 lg:px-8">
@@ -81,6 +84,49 @@ defmodule ChatAgentWeb.Layouts do
     <div id={@id} aria-live="polite">
       <.flash kind={:info} flash={@flash} />
       <.flash kind={:error} flash={@flash} />
+    </div>
+    """
+  end
+
+  @doc """
+  Who is signed in, and what they can do about it.
+
+  Sits in the app bar next to the theme toggle, so account actions and
+  appearance live in the same place on every page. Signed out, it is the one
+  link into the dashboard.
+
+  ## Examples
+
+      <.user_menu current_scope={@current_scope} />
+  """
+  attr :current_scope, :map,
+    default: nil,
+    doc: "the current [scope](https://phoenix.hexdocs.pm/scopes.html)"
+
+  def user_menu(assigns) do
+    ~H"""
+    <div class="app-user">
+      <%= if @current_scope do %>
+        <span class="app-user-name" title={@current_scope.user.email}>
+          <.icon name="hero-user-circle-micro" />
+          {@current_scope.user.email}
+        </span>
+
+        <.link href={~p"/users/settings"} class="app-user-link" title="Account settings">
+          <.icon name="hero-cog-6-tooth-micro" />
+          <span class="app-user-label">Settings</span>
+        </.link>
+
+        <.link href={~p"/users/log-out"} method="delete" class="app-user-link" title="Log out">
+          <.icon name="hero-arrow-right-start-on-rectangle-micro" />
+          <span class="app-user-label">Log out</span>
+        </.link>
+      <% else %>
+        <.link href={~p"/users/log-in"} class="app-user-link" title="Log in">
+          <.icon name="hero-arrow-right-end-on-rectangle-micro" />
+          <span class="app-user-label">Log in</span>
+        </.link>
+      <% end %>
     </div>
     """
   end

@@ -45,3 +45,6 @@ config/*.override.exs
 # Claude config files
 claude.settings.local.json
 
+# SQLite databases (dev/test are created by ecto).
+priv/repo/*.db*
+priv/repo/*.sqlite3*

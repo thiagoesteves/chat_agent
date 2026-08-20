@@ -355,7 +355,7 @@ defmodule ChatAgentWeb.ChannelLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} max_width="page-wide">
+    <Layouts.app flash={@flash} current_scope={@current_scope} max_width="page-wide">
       <div class="channels">
         <.tunnel_panel
           tunnel={@tunnel}

@@ -11,6 +11,10 @@ defmodule ChatAgent.Assistant.SessionTest do
   alias ChatAgent.Channel
   alias ChatAgent.Channel.Message
 
+  # Every failure path here logs on purpose, so the suite would otherwise read
+  # as though something went wrong. A failing test still prints what it logged.
+  @moduletag :capture_log
+
   @key {:mock, "123456"}
 
   # A session answers from its own process, so the mocks serve any process.

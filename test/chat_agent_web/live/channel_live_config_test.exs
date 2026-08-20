@@ -2,6 +2,8 @@ defmodule ChatAgentWeb.ChannelLiveConfigTest do
   # Not async: registering an extra channel changes global application config.
   use ChatAgentWeb.ConnCase, async: false
 
+  setup :register_and_log_in_user
+
   import Mox
 
   alias ChatAgent.Channel

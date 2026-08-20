@@ -60,6 +60,13 @@ defmodule ChatAgent.MixProject do
       # crashed agent is an EXIT message rather than an orphaned process.
       {:erlexec, "~> 2.2"},
 
+      # Database and authentication support.
+      {:phoenix_ecto, "~> 4.4"},
+      {:ecto_sql, "~> 3.10"},
+      {:ecto_sqlite3, "~> 0.17"},
+      {:pbkdf2_elixir, "~> 2.3"},
+      {:swoosh, "~> 1.14"},
+
       # Asset build. Both install a platform binary on first use and are only
       # needed while developing: a release serves what `assets.deploy` built.
       # Heroicons is the icon source the Tailwind plugin in assets/vendor reads,
@@ -120,6 +127,12 @@ defmodule ChatAgent.MixProject do
         # out of the test suite.
         ChatAgent.Commander.Local,
         ChatAgentWeb.ConnCase,
+        ChatAgent.DataCase,
+        # Fixtures the generators write and the generators call: `:scopes` in
+        # config/config.exs names this module, so the next generated test uses
+        # what today's tests have not needed yet. Calling them from a test to
+        # raise a number would be testing the test helpers.
+        ChatAgent.AccountsFixtures,
         # `embed_templates` generates layout and error page functions, and cover
         # does not attribute execution back to them.
         ChatAgentWeb.CoreComponents,
@@ -140,7 +153,11 @@ defmodule ChatAgent.MixProject do
   # See `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "assets.setup", "assets.build"],
+      setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],
+      # Creating, migrating and seeding are one step, so a fresh clone reaches a
+      # database it can log into rather than an empty one.
+      "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
+      "ecto.reset": ["ecto.drop", "ecto.setup"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       # Compiling first is what makes colocated JS and the icon set available to
       # the bundler, so the order matters.
@@ -150,6 +167,9 @@ defmodule ChatAgent.MixProject do
         "esbuild chat_agent --minify",
         "phx.digest"
       ],
+      # `mix test` runs under MIX_ENV=test, so this prepares the test database
+      # and leaves the development one alone.
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       precommit: [
         "compile --warnings-as-errors",
         "deps.unlock --unused",

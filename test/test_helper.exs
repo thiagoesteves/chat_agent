@@ -17,3 +17,5 @@ Mox.defmock(ChatAgent.TunnelProviderMock, for: ChatAgent.Tunnel.Provider.Adapter
 Mox.defmock(ChatAgent.AssistantMock, for: ChatAgent.Assistant.Adapter)
 
 ExUnit.start()
+
+Ecto.Adapters.SQL.Sandbox.mode(ChatAgent.Repo, :manual)

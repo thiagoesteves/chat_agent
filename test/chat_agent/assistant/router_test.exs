@@ -10,6 +10,10 @@ defmodule ChatAgent.Assistant.RouterTest do
   alias ChatAgent.Channel
   alias ChatAgent.Channel.Message
 
+  # Every failure path here logs on purpose, so the suite would otherwise read
+  # as though something went wrong. A failing test still prints what it logged.
+  @moduletag :capture_log
+
   @password "test_assistant_password"
 
   # The router works from its own process, and its sessions from theirs again,

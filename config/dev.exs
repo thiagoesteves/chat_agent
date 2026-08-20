@@ -62,3 +62,7 @@ config :phoenix_live_view,
   debug_attributes: true,
   # Enable helpful, but potentially expensive runtime checks
   enable_expensive_runtime_checks: true
+
+config :chat_agent, ChatAgent.Repo,
+  database: "priv/repo/dev.sqlite3",
+  pool_size: 1
