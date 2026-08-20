@@ -68,10 +68,14 @@ config :chat_agent, ChatAgent.Tunnel.Provider.Ngrok,
 #     config :chat_agent, ChatAgent.Tunnel.Provider.Pinggy,
 #       access_token: "fake-pinggy-token"
 
-# Who may talk to the assistant, and where it may work. Without a password
-# nobody is let in and the assistant is not started at all.
+# Who may talk to the assistant, and where it may work. This is a hash of the
+# password, not the password, so the file never holds one. Generate it with:
+#
+#     mix run -e 'IO.puts(Pbkdf2.hash_pwd_salt("the password you will type"))'
+#
+# Without one nobody is let in and the assistant is not started at all.
 config :chat_agent, ChatAgent.Assistant,
-  password: "another-long-random-password",
+  salted_password: "$pbkdf2-sha512$160000$FAKEfakeFAKEfakeFAKEfake$FAKEfakeFAKEfake",
   working_dir_root: "/Users/you/code"
 
 # What the assistant may do. Nothing is granted by default.
@@ -172,7 +176,7 @@ If you run it anyway, the parts that already work like a deployment are:
 PHX_HOST=chat.example.com          # the public URL, instead of a tunnel
 SECRET_KEY_BASE=…                  # mix phx.gen.secret
 DATABASE_PATH=/data/chat_agent.db  # a mounted volume
-ASSISTANT_PASSWORD=…               # without one, nothing is answered
+ASSISTANT_SALTED_PASSWORD=…        # a hash, not a password; without one nothing is answered
 ```
 
 A release cannot run Mix, so migrations run through the release itself:

@@ -15,9 +15,14 @@ defmodule ChatAgent.Assistant do
       config :chat_agent, ChatAgent.Assistant,
         # Which assistant answers when a conversation names none.
         default: :claude,
-        # The password a conversation has to give before anything is answered.
-        # Set from ASSISTANT_PASSWORD. Without one, nobody is let in.
-        password: nil,
+        # What a conversation's password is checked against, hashed and salted
+        # rather than written down. Set from ASSISTANT_SALTED_PASSWORD, and
+        # generated with:
+        #
+        #     mix run -e 'IO.puts(Pbkdf2.hash_pwd_salt("hunter2"))'
+        #
+        # Without one, nobody is let in.
+        salted_password: nil,
         # Where sessions work. The root is the one place a conversation may
         # pick from with --work-dir, and the default is what a conversation
         # that picks nothing gets: a name under the root, so the two are
@@ -305,13 +310,19 @@ defmodule ChatAgent.Assistant do
   it only when this is true.
   """
   @spec enabled?() :: boolean()
-  def enabled?, do: not is_nil(password()) and list() != []
+  def enabled?, do: not is_nil(salted_password()) and list() != []
 
   @doc """
-  The password a conversation has to give, or `nil` when none is configured.
+  The hash a conversation's password is checked against, or `nil` when none is
+  configured.
+
+  A hash rather than the password itself, so that reading the configuration,
+  the logs, or a crash dump gives nobody a way in. Generate one with:
+
+      mix run -e 'IO.puts(Pbkdf2.hash_pwd_salt("the password you will type"))'
   """
-  @spec password() :: String.t() | nil
-  def password, do: Keyword.get(config(), :password)
+  @spec salted_password() :: String.t() | nil
+  def salted_password, do: Keyword.get(config(), :salted_password)
 
   @doc """
   How long a session survives with nothing said in it.

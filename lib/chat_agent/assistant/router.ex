@@ -58,7 +58,7 @@ defmodule ChatAgent.Assistant.Router do
   def init(options) do
     Enum.each(Channel.list(), fn {channel, _module} -> Channel.subscribe(channel) end)
 
-    if is_nil(Assistant.password()) do
+    if is_nil(Assistant.salted_password()) do
       Logger.warning(%{
         what: "assistant_router_locked",
         reason: "no password configured, so no conversation can be answered"
@@ -229,12 +229,19 @@ defmodule ChatAgent.Assistant.Router do
     end
   end
 
-  # Compared in constant time, and never against a missing configuration: with
-  # no password set, nothing opens a session.
+  # Checked against a hash, so what is configured is not what is typed, and
+  # nothing that reads the configuration learns the password.
+  #
+  # With none configured the work is done anyway and thrown away: answering a
+  # guess faster when there is no password to check would say so.
   defp correct?(given) do
-    case Assistant.password() do
-      nil -> false
-      password -> Plug.Crypto.secure_compare(given, password)
+    case Assistant.salted_password() do
+      nil ->
+        Pbkdf2.no_user_verify()
+        false
+
+      salted_password ->
+        Pbkdf2.verify_pass(given, salted_password)
     end
   end
 

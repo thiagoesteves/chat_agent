@@ -235,12 +235,19 @@ defmodule ChatAgent.AssistantTest do
 
   describe "configuration" do
     test "answers with what is configured" do
-      configure(default: :claude, session_timeout: 1_000, history_limit: 7, password: "secret")
+      salted = Pbkdf2.hash_pwd_salt("secret")
+
+      configure(
+        default: :claude,
+        session_timeout: 1_000,
+        history_limit: 7,
+        salted_password: salted
+      )
 
       assert Assistant.default() == :claude
       assert Assistant.session_timeout() == 1_000
       assert Assistant.history_limit() == 7
-      assert Assistant.password() == "secret"
+      assert Assistant.salted_password() == salted
       assert Assistant.list() == [claude: ChatAgent.AssistantMock]
     end
 
@@ -250,18 +257,22 @@ defmodule ChatAgent.AssistantTest do
       assert Assistant.default() == :claude
       assert Assistant.session_timeout() == :timer.minutes(5)
       assert Assistant.history_limit() == 20
-      assert Assistant.password() == nil
+      assert Assistant.salted_password() == nil
       assert Assistant.list() == []
     end
 
     test "is enabled only with both a password and an assistant to answer" do
-      configure(password: "secret")
+      configure(salted_password: Pbkdf2.hash_pwd_salt("secret"))
       assert Assistant.enabled?()
 
-      configure(password: nil)
+      configure(salted_password: nil)
       refute Assistant.enabled?()
 
-      Application.put_env(:chat_agent, Assistant, password: "secret", adapters: [])
+      Application.put_env(:chat_agent, Assistant,
+        salted_password: Pbkdf2.hash_pwd_salt("secret"),
+        adapters: []
+      )
+
       refute Assistant.enabled?()
     end
   end

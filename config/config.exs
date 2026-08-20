@@ -73,9 +73,9 @@ config :chat_agent, ChatAgent.Tunnel.Provider.Pinggy,
 # mock in tests, so nothing there reaches the machine.
 config :chat_agent, ChatAgent.Commander, adapter: ChatAgent.Commander.Local
 
-# Who can answer a person, and the rules the router follows. The password is
-# read from the environment in config/runtime.exs and has no default: with none
-# set, no conversation is answered at all.
+# Who can answer a person, and the rules the router follows. What a password is
+# checked against is read from the environment in config/runtime.exs and has no
+# default: with none set, no conversation is answered at all.
 config :chat_agent, ChatAgent.Assistant,
   default: :claude,
   # Where sessions work. The root is the one place a conversation may pick from
