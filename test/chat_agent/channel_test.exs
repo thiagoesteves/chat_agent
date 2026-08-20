@@ -1,7 +1,10 @@
 defmodule ChatAgent.ChannelTest do
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
   import Mox
+
+  require Logger
 
   alias ChatAgent.Channel
   alias ChatAgent.Channel.Message
@@ -135,6 +138,109 @@ defmodule ChatAgent.ChannelTest do
     test "does not double the separator when the base URL ends in one" do
       assert Channel.webhook_url(:whatsapp, "https://example.com/") ==
                "https://example.com/whatsapp/webhook"
+    end
+  end
+
+  describe "allowed_chat_ids" do
+    setup do
+      configured = Application.get_env(:chat_agent, ChatAgent.ChannelMock)
+
+      on_exit(fn ->
+        case configured do
+          nil -> Application.delete_env(:chat_agent, ChatAgent.ChannelMock)
+          configured -> Application.put_env(:chat_agent, ChatAgent.ChannelMock, configured)
+        end
+      end)
+
+      stub_channel()
+
+      :ok
+    end
+
+    defp allow(chat_ids) do
+      Application.put_env(:chat_agent, ChatAgent.ChannelMock, allowed_chat_ids: chat_ids)
+    end
+
+    defp inbound(conversation) do
+      %{"from" => conversation, "text" => %{"body" => "hello"}}
+    end
+
+    test "talks to anyone when nothing is configured" do
+      allow([])
+
+      assert Channel.allowed?(:mock, "123456")
+    end
+
+    test "talks to a listed conversation and no other" do
+      allow(["123456"])
+
+      assert Channel.allowed?(:mock, "123456")
+      refute Channel.allowed?(:mock, "999999")
+    end
+
+    test "compares what identifies a conversation, not how it was written" do
+      allow([123_456])
+
+      # A chat id is a number in Telegram's payloads and a string in a config
+      # file, and both mean the same conversation.
+      assert Channel.allowed?(:mock, 123_456)
+      assert Channel.allowed?(:mock, "123456")
+    end
+
+    test "broadcasts a message from a listed conversation" do
+      allow(["123456"])
+      Channel.subscribe(:mock)
+
+      expect(ChatAgent.ChannelMock, :handle_message, fn _payload ->
+        {:ok, Message.new(sender: "123456", conversation: "123456", text: "hello")}
+      end)
+
+      assert :ok = Channel.handle_message(:mock, inbound("123456"))
+
+      assert_receive {:message, %Message{conversation: "123456"}}
+    end
+
+    test "ignores a message from anyone else, and tells nobody but the log" do
+      # The log says which conversation was turned away, which is how it gets
+      # added to the list when it should have been on it.
+      Logger.configure(level: :info)
+      on_exit(fn -> Logger.configure(level: :warning) end)
+
+      allow(["123456"])
+      Channel.subscribe(:mock)
+
+      expect(ChatAgent.ChannelMock, :handle_message, fn _payload ->
+        {:ok, Message.new(sender: "999999", conversation: "999999", text: "let me in")}
+      end)
+
+      log =
+        capture_log(fn ->
+          # Answered as though it had been handled: a stranger learns nothing
+          # from the reply the webhook gives.
+          assert :ok = Channel.handle_message(:mock, inbound("999999"))
+        end)
+
+      # It reaches no dashboard and no assistant.
+      refute_receive {:message, _message}
+      assert log =~ "channel_message_ignored"
+      assert log =~ "999999"
+    end
+
+    test "refuses to send to a conversation nobody listed" do
+      allow(["123456"])
+
+      # With `verify_on_exit!` and no expectation, reaching the channel module
+      # would fail this test: nothing is sent at all.
+      assert {:error, {:conversation_not_allowed, "999999"}} =
+               Channel.send_message(:mock, "999999", "hello")
+    end
+
+    test "sends to a listed conversation" do
+      allow(["123456"])
+
+      expect(ChatAgent.ChannelMock, :send_message, fn "123456", "hello" -> :ok end)
+
+      assert :ok = Channel.send_message(:mock, "123456", "hello")
     end
   end
 

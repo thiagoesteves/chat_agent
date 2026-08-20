@@ -30,6 +30,18 @@ defmodule ChatAgent.Channel do
       ChatAgent.Channel.subscribe(:whatsapp)
       # => receives {:message, %ChatAgent.Channel.Message{}}
 
+  ## Who it will talk to
+
+  A channel with no `:allowed_chat_ids` configured talks to anyone, which is
+  what a webhook does by default: whoever can find the bot can message it.
+  Configure the list and everything else is ignored, in either direction.
+
+      config :chat_agent, ChatAgent.Channel.Telegram,
+        allowed_chat_ids: ["123456", "-1001234567890"]
+
+  The value is whatever identifies a conversation on that channel: a chat id
+  for Telegram, a phone number for WhatsApp.
+
   ## Adding a new channel
 
   Implement `ChatAgent.Channel.Adapter` and add the module under a new channel
@@ -39,6 +51,8 @@ defmodule ChatAgent.Channel do
 
   alias ChatAgent.Channel.Adapter
   alias ChatAgent.Channel.Message
+
+  require Logger
 
   @type channel :: atom()
 
@@ -70,7 +84,7 @@ defmodule ChatAgent.Channel do
 
       module ->
         case module.handle_message(payload) do
-          {:ok, %Message{} = message} -> broadcast(channel, message)
+          {:ok, %Message{} = message} -> receive_from(channel, message)
           other -> other
         end
     end
@@ -102,15 +116,28 @@ defmodule ChatAgent.Channel do
         ) :: :ok | {:error, term()}
   def send_message(channel, recipient, body, options \\ []) do
     case adapter(channel) do
-      nil ->
-        {:error, {:unknown_channel, channel}}
+      nil -> {:error, {:unknown_channel, channel}}
+      module -> send_to(channel, module, recipient, body, options)
+    end
+  end
 
-      module ->
-        with :ok <- module.send_message(recipient, body) do
-          # Subscribers see a reply the same way they see an inbound message, so
-          # a conversation reads as a whole and every open view stays in step.
-          broadcast(channel, sent_message(recipient, body, options))
-        end
+  @doc """
+  Whether this app will talk to `conversation` on `channel`.
+
+  A channel with no `:allowed_chat_ids` configured talks to anyone, which is
+  what a webhook does by default. Configure the list and it talks to those
+  conversations and no others, in either direction.
+
+  ## Examples
+
+      iex> ChatAgent.Channel.allowed?(:telegram, "123456")
+      true
+  """
+  @spec allowed?(channel :: channel(), conversation :: Adapter.recipient()) :: boolean()
+  def allowed?(channel, conversation) do
+    case allowed_chat_ids(channel) do
+      [] -> true
+      allowed -> to_string(conversation) in allowed
     end
   end
 
@@ -191,6 +218,47 @@ defmodule ChatAgent.Channel do
   ### ==========================================================================
   ### Private functions
   ### ==========================================================================
+
+  # The outbound half of the list, beside the inbound one below: this app talks
+  # to the conversations somebody named and to nobody else.
+  defp send_to(channel, module, recipient, body, options) do
+    if allowed?(channel, recipient) do
+      with :ok <- module.send_message(recipient, body) do
+        # Subscribers see a reply the same way they see an inbound message, so
+        # a conversation reads as a whole and every open view stays in step.
+        broadcast(channel, sent_message(recipient, body, options))
+      end
+    else
+      {:error, {:conversation_not_allowed, to_string(recipient)}}
+    end
+  end
+
+  # A message from a conversation nobody listed is dropped here rather than
+  # broadcast: it reaches no dashboard, no assistant and no log of its own
+  # beyond this one. Whoever can find the bot can message it, and this is what
+  # decides which of them it hears.
+  defp receive_from(channel, %Message{} = message) do
+    if allowed?(channel, message.conversation) do
+      broadcast(channel, message)
+    else
+      Logger.info(%{
+        what: "channel_message_ignored",
+        channel: channel,
+        conversation: message.conversation,
+        reason: "conversation is not in :allowed_chat_ids"
+      })
+
+      :ok
+    end
+  end
+
+  # Configuration set to nil is configuration all the same, so the default is
+  # applied to what comes back rather than to what was asked for.
+  defp allowed_chat_ids(channel) do
+    (Application.get_env(:chat_agent, adapter(channel)) || [])
+    |> Keyword.get(:allowed_chat_ids, [])
+    |> Enum.map(&to_string/1)
+  end
 
   defp broadcast(channel, message) do
     Phoenix.PubSub.broadcast(@pubsub, topic(channel), {:message, %{message | channel: channel}})

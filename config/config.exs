@@ -45,6 +45,15 @@ config :chat_agent, ChatAgent.Channel,
 # from the environment in config/runtime.exs.
 config :chat_agent, ChatAgent.Channel.Whatsapp, api_version: "v20.0"
 
+# Which conversations this app will talk to, in either direction. Empty means
+# anyone who can find the bot, which is what a webhook does by default; a list
+# means those and no others. The value identifies a conversation on that
+# channel: a chat id for Telegram, a phone number for WhatsApp. Set them per
+# machine in config/<env>.override.exs, or from TELEGRAM_ALLOWED_CHAT_IDS and
+# WHATSAPP_ALLOWED_CHAT_IDS.
+config :chat_agent, ChatAgent.Channel.Telegram, allowed_chat_ids: []
+config :chat_agent, ChatAgent.Channel.Whatsapp, allowed_chat_ids: []
+
 # Public ingress. Without a provider no tunnel is run and the URL, if any,
 # comes from the `:url` key: that is how a deployment behind DNS runs, and
 # `TUNNEL_PROVIDER=ngrok` or `TUNNEL_PROVIDER=pinggy` in config/runtime.exs is

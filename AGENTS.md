@@ -96,7 +96,7 @@ A key belongs to exactly one channel, so nothing has to be prefixed to stay apar
 Defaults live in `config/config.exs`, secrets are read from the environment in `config/runtime.exs`, and each key there is set only when its variable is present, so a local `config/<env>.override.exs` is never overwritten with a nil.
 
 Runtime configuration comes from environment variables read in `config/runtime.exs`:
-`ASSISTANT_SALTED_PASSWORD`, `ASSISTANT_WORKING_DIR_ROOT`, `ASSISTANT_WORKING_DIR`, `CLAUDE_EXECUTABLE`, `CLAUDE_ALLOWED_TOOLS`, `PINGGY_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `HEALTHCHECK_LOGGING`, `TUNNEL_PROVIDER`, `PUBLIC_URL`, `NGROK_AUTHTOKEN`, `NGROK_DOMAIN`.
+`ASSISTANT_SALTED_PASSWORD`, `TELEGRAM_ALLOWED_CHAT_IDS`, `WHATSAPP_ALLOWED_CHAT_IDS`, `ASSISTANT_WORKING_DIR_ROOT`, `ASSISTANT_WORKING_DIR`, `CLAUDE_EXECUTABLE`, `CLAUDE_ALLOWED_TOOLS`, `PINGGY_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `HEALTHCHECK_LOGGING`, `TUNNEL_PROVIDER`, `PUBLIC_URL`, `NGROK_AUTHTOKEN`, `NGROK_DOMAIN`.
 
 ### The public URL
 
@@ -318,6 +318,23 @@ Left to the run, a missing tool arrives as an exit status wrapped around a sente
 
 erlexec refuses to start when the BEAM runs as root.
 A deployment that does (a container running as root, say) has to configure `config :erlexec, root: true, user: "...", limit_users: ["..."]` for the app to boot at all, which is one more reason a deployment behind DNS runs no tunnel.
+
+### Who a channel will talk to
+
+A webhook is reachable by whoever can find the bot, so a second list decides which conversations this app answers at all:
+
+```elixir
+config :chat_agent, ChatAgent.Channel.Telegram,
+  allowed_chat_ids: ["123456", "-1001234567890"]
+```
+
+Empty means anyone, which is what a webhook does by default.
+A list means those conversations and no others, **in both directions**: an inbound message from anywhere else is dropped in `ChatAgent.Channel.handle_message/2` before it is broadcast, so it reaches no dashboard and no assistant, and `send_message/4` refuses to send anywhere else with `{:error, {:conversation_not_allowed, id}}`.
+
+The value is whatever identifies a conversation on that channel, a chat id for Telegram and a phone number for WhatsApp, compared as strings so a number in a payload and a string in a configuration file mean the same conversation.
+A turned-away message is logged as `channel_message_ignored` with the conversation, which is how it gets added to the list when it should have been on it.
+
+The webhook still answers normally to the service, since a stranger learns nothing from a reply that says it was handled.
 
 ### Request logging
 
