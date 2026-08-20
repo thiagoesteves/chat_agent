@@ -82,6 +82,10 @@ if public_url do
   config :chat_agent, ChatAgent.Tunnel, url: public_url
 end
 
+if pinggy_access_token = System.get_env("PINGGY_ACCESS_TOKEN") do
+  config :chat_agent, ChatAgent.Tunnel.Provider.Pinggy, access_token: pinggy_access_token
+end
+
 if ngrok_authtoken = System.get_env("NGROK_AUTHTOKEN") do
   config :chat_agent, ChatAgent.Tunnel.Provider.Ngrok, authtoken: ngrok_authtoken
 end

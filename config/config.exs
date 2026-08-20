@@ -60,6 +60,13 @@ config :chat_agent, ChatAgent.Tunnel.Provider.Pinggy,
   executable: "ssh",
   host: "free.pinggy.io",
   ssh_port: 443,
+  # A token buys a tunnel that lasts and a name that stays, and Pinggy takes it
+  # as the SSH user. Set from PINGGY_ACCESS_TOKEN; without one the tunnel is
+  # anonymous and expires after an hour.
+  access_token: nil,
+  # Passed as `-o`, one per element, and what makes ssh usable with nobody at
+  # the keyboard.
+  ssh_options: ["StrictHostKeyChecking=no", "ServerAliveInterval=30"],
   extra_args: []
 
 # Runs the operating system commands a tunnel provider needs. Swapped for a

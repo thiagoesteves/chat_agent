@@ -96,7 +96,7 @@ A key belongs to exactly one channel, so nothing has to be prefixed to stay apar
 Defaults live in `config/config.exs`, secrets are read from the environment in `config/runtime.exs`, and each key there is set only when its variable is present, so a local `config/<env>.override.exs` is never overwritten with a nil.
 
 Runtime configuration comes from environment variables read in `config/runtime.exs`:
-`ASSISTANT_PASSWORD`, `ASSISTANT_WORKING_DIR_ROOT`, `ASSISTANT_WORKING_DIR`, `CLAUDE_EXECUTABLE`, `CLAUDE_ALLOWED_TOOLS`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `HEALTHCHECK_LOGGING`, `TUNNEL_PROVIDER`, `PUBLIC_URL`, `NGROK_AUTHTOKEN`, `NGROK_DOMAIN`.
+`ASSISTANT_PASSWORD`, `ASSISTANT_WORKING_DIR_ROOT`, `ASSISTANT_WORKING_DIR`, `CLAUDE_EXECUTABLE`, `CLAUDE_ALLOWED_TOOLS`, `PINGGY_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `HEALTHCHECK_LOGGING`, `TUNNEL_PROVIDER`, `PUBLIC_URL`, `NGROK_AUTHTOKEN`, `NGROK_DOMAIN`.
 
 ### The public URL
 
