@@ -39,12 +39,22 @@ config :chat_agent, ChatAgent.Channel.Whatsapp,
   access_token: "test_access_token",
   phone_number_id: "123456789",
   api_version: "v20.0",
-  req_options: [plug: {Req.Test, ChatAgent.Channel.Whatsapp}]
+  req_options: [
+    plug: {Req.Test, ChatAgent.Channel.Whatsapp},
+    retry_delay: 0,
+    retry_log_level: false
+  ]
 
 config :chat_agent, ChatAgent.Channel.Telegram,
   bot_token: "test_telegram_bot_token",
   webhook_secret: "test_telegram_webhook_secret",
-  req_options: [plug: {Req.Test, ChatAgent.Channel.Telegram}]
+  # No waiting between retries, and no log line for each: what a retry does is
+  # under test, not how long Req waits before it.
+  req_options: [
+    plug: {Req.Test, ChatAgent.Channel.Telegram},
+    retry_delay: 0,
+    retry_log_level: false
+  ]
 
 # SQLite takes one writer at a time, so a single pooled connection is what keeps
 # concurrent `async: true` tests from colliding on it. Sandbox ownership then

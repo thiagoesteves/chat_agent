@@ -133,9 +133,14 @@ defmodule ChatAgent.Channel.Telegram do
       text: body
     }
 
+    # Retried, because the alternative is somebody waiting for an answer that
+    # was written and never arrived. A timeout says nothing about whether the
+    # message was delivered, so a retry can deliver it twice: a repeated answer
+    # is the price of an answer, and the Bot API offers no way to say "this one
+    # again" rather than "another one".
     "sendMessage"
     |> api_url()
-    |> Req.post(request_options(json: payload))
+    |> Req.post(request_options(json: payload, retry: :transient, max_retries: 2))
     |> interpret_response()
   end
 

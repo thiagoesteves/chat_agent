@@ -414,6 +414,51 @@ defmodule ChatAgent.Channel.TelegramTest do
       assert :ok = Telegram.send_message(123_456, "Hello")
     end
 
+    test "keeps trying when the send times out, since somebody is waiting" do
+      {:ok, attempts} = Agent.start_link(fn -> 0 end)
+
+      Req.Test.stub(Telegram, fn conn ->
+        case Agent.get_and_update(attempts, &{&1 + 1, &1 + 1}) do
+          1 -> Req.Test.transport_error(conn, :timeout)
+          2 -> Req.Test.transport_error(conn, :timeout)
+          _ -> Req.Test.json(conn, %{"ok" => true, "result" => %{"message_id" => 1}})
+        end
+      end)
+
+      assert :ok = Telegram.send_message(123_456, "Hello")
+      assert Agent.get(attempts, & &1) == 3
+    end
+
+    test "gives up rather than trying for ever" do
+      {:ok, attempts} = Agent.start_link(fn -> 0 end)
+
+      Req.Test.stub(Telegram, fn conn ->
+        Agent.update(attempts, &(&1 + 1))
+        Req.Test.transport_error(conn, :timeout)
+      end)
+
+      assert {:error, %Req.TransportError{reason: :timeout}} =
+               Telegram.send_message(123_456, "Hello")
+
+      # Three attempts, not an unbounded number: the caller marks it undelivered
+      # and the dashboard says so.
+      assert Agent.get(attempts, & &1) == 3
+    end
+
+    test "does not retry a refusal, which would be refused again" do
+      {:ok, attempts} = Agent.start_link(fn -> 0 end)
+
+      Req.Test.stub(Telegram, fn conn ->
+        Agent.update(attempts, &(&1 + 1))
+        Req.Test.json(conn, %{"ok" => false, "description" => "chat not found"})
+      end)
+
+      assert {:error, {:telegram_error, "chat not found"}} =
+               Telegram.send_message(123_456, "Hello")
+
+      assert Agent.get(attempts, & &1) == 1
+    end
+
     test "reports a failure the Bot API answers 200 with" do
       Req.Test.stub(Telegram, fn conn ->
         Req.Test.json(conn, %{"ok" => false, "description" => "chat not found"})

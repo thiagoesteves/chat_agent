@@ -105,6 +105,22 @@ defmodule ChatAgent.Channel.WhatsappTest do
     end
   end
 
+  describe "sending through a network that drops" do
+    test "keeps trying when the send times out" do
+      {:ok, attempts} = Agent.start_link(fn -> 0 end)
+
+      Req.Test.stub(Whatsapp, fn conn ->
+        case Agent.get_and_update(attempts, &{&1 + 1, &1 + 1}) do
+          1 -> Req.Test.transport_error(conn, :timeout)
+          _ -> Req.Test.json(conn, %{"messages" => [%{"id" => "wamid.1"}]})
+        end
+      end)
+
+      assert :ok = Whatsapp.send_message("1234567890", "Hello")
+      assert Agent.get(attempts, & &1) == 2
+    end
+  end
+
   describe "authenticate/1" do
     test "accepts the request, since the URL is what identifies the channel today" do
       assert :ok = Whatsapp.authenticate(%Plug.Conn{})

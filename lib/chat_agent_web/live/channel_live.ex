@@ -211,8 +211,21 @@ defmodule ChatAgentWeb.ChannelLive do
   # "you" is what the facade calls a person at the dashboard; anything else is
   # the assistant that wrote it, and saying "sent from this dashboard" for one
   # of those would be a lie the reader cannot check.
-  defp sent_by(%Message{sender: "you"}), do: "sent from this dashboard"
-  defp sent_by(%Message{sender: sender}), do: "sent by #{sender}"
+  #
+  # A reply the service would not take says so first: it is on screen, and
+  # nowhere else, so a reader who is told nothing would take it for delivered.
+  defp undelivered?(%Message{identifiers: identifiers}), do: {"delivery", "failed"} in identifiers
+
+  defp sent_by(%Message{identifiers: identifiers} = message) do
+    if {"delivery", "failed"} in identifiers do
+      "could not be delivered"
+    else
+      sent_by_whom(message)
+    end
+  end
+
+  defp sent_by_whom(%Message{sender: "you"}), do: "sent from this dashboard"
+  defp sent_by_whom(%Message{sender: sender}), do: "sent by #{sender}"
 
   # Each assistant's own mark, so the badge is recognisable before it is read.
   # Claude's is the burst it signs its own answers with; anything else gets a
@@ -417,7 +430,10 @@ defmodule ChatAgentWeb.ChannelLive do
                         <span class="message-id-name">{Enum.join(names, " · ")}</span>
                         <span class="message-id-value" title={value}>{value}</span>
                       </span>
-                      <span :if={message.direction == :outbound} class="message-manual">
+                      <span
+                        :if={message.direction == :outbound}
+                        class={["message-manual", undelivered?(message) && "is-undelivered"]}
+                      >
                         {sent_by(message)}
                       </span>
                     </p>

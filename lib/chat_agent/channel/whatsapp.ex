@@ -144,6 +144,9 @@ defmodule ChatAgent.Channel.Whatsapp do
       json: payload
     ]
 
+    # Retried for the same reason Telegram's is: a timeout says nothing about
+    # whether the message arrived, and somebody is waiting for it.
+    options = Keyword.merge([retry: :transient, max_retries: 2], options)
     req_options = config(:req_options) || []
 
     url

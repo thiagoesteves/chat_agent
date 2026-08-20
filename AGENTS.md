@@ -289,8 +289,13 @@ The last two are the ones that surprise: a policy full of `Bash(...)` rules and 
 
 Prefer the app's own settings file over `setting_sources`: the bot's policy is then reviewed where the bot is deployed, rather than by whoever last edited the repository it is working in, and it cannot pick up a personal allow list that was accumulated by clicking "yes" in an interactive session.
 
-**A reply that could not be sent is logged.**
-Only a message the channel accepted is broadcast, so a rejected reply reaches neither the person nor the dashboard: without `assistant_reply_not_sent` in the log, that looks exactly like a bug in here.
+**A send that times out is retried, twice, before it counts as failed.**
+A timeout says nothing about whether the message arrived, so the retry can deliver it twice; a repeated answer is the price of an answer, and neither service offers a way to say "this one again" rather than "another one".
+A refusal is not retried, since it would be refused again.
+
+**A reply that still could not be sent is broadcast anyway, marked as undelivered.**
+It carries `{"delivery", "failed"}` among its identifiers, the dashboard says "could not be delivered" instead of naming an author, and `channel_message_not_delivered` in the log says why.
+A reply that reached nobody and appeared nowhere leaves two people looking at a conversation with a hole in it: whoever was waiting for an answer, and whoever is watching the dashboard for one.
 
 ### Running OS commands
 
