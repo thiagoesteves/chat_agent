@@ -30,11 +30,15 @@ if telegram_webhook_secret = System.get_env("TELEGRAM_WEBHOOK_SECRET") do
   config :chat_agent, ChatAgent.Channel.Telegram, webhook_secret: telegram_webhook_secret
 end
 
-# The password a conversation has to give before an assistant answers it.
+# What a conversation's password is checked against, hashed and salted rather
+# than written down, so that reading the configuration gives nobody a way in:
+#
+#     mix run -e 'IO.puts(Pbkdf2.hash_pwd_salt("hunter2"))'
+#
 # Unset means nobody is let in, which is the right default for something that
 # listens to whoever can reach the bot.
-if assistant_password = System.get_env("ASSISTANT_PASSWORD") do
-  config :chat_agent, ChatAgent.Assistant, password: assistant_password
+if assistant_salted_password = System.get_env("ASSISTANT_SALTED_PASSWORD") do
+  config :chat_agent, ChatAgent.Assistant, salted_password: assistant_salted_password
 end
 
 if working_dir_root = System.get_env("ASSISTANT_WORKING_DIR_ROOT") do

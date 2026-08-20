@@ -96,7 +96,7 @@ A key belongs to exactly one channel, so nothing has to be prefixed to stay apar
 Defaults live in `config/config.exs`, secrets are read from the environment in `config/runtime.exs`, and each key there is set only when its variable is present, so a local `config/<env>.override.exs` is never overwritten with a nil.
 
 Runtime configuration comes from environment variables read in `config/runtime.exs`:
-`ASSISTANT_PASSWORD`, `ASSISTANT_WORKING_DIR_ROOT`, `ASSISTANT_WORKING_DIR`, `CLAUDE_EXECUTABLE`, `CLAUDE_ALLOWED_TOOLS`, `PINGGY_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `HEALTHCHECK_LOGGING`, `TUNNEL_PROVIDER`, `PUBLIC_URL`, `NGROK_AUTHTOKEN`, `NGROK_DOMAIN`.
+`ASSISTANT_SALTED_PASSWORD`, `ASSISTANT_WORKING_DIR_ROOT`, `ASSISTANT_WORKING_DIR`, `CLAUDE_EXECUTABLE`, `CLAUDE_ALLOWED_TOOLS`, `PINGGY_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `HEALTHCHECK_LOGGING`, `TUNNEL_PROVIDER`, `PUBLIC_URL`, `NGROK_AUTHTOKEN`, `NGROK_DOMAIN`.
 
 ### The public URL
 
@@ -188,7 +188,8 @@ The router is what holds the protections, and each one exists for a reason worth
 |---|---|
 | A wrong password is answered with silence | Saying "wrong password" confirms to whoever is guessing that a password is what opens this |
 | No password configured means nobody is let in, and the router is not even started | A default password is a password everybody knows |
-| The password is compared with `Plug.Crypto.secure_compare/2` | A comparison that stops at the first wrong byte reports how much of a guess was right |
+| Configuration holds a salted hash, never the password | Reading the configuration, the logs or a crash dump should give nobody a way in |
+| A guess is checked with `Pbkdf2.verify_pass/2`, and `Pbkdf2.no_user_verify/0` runs when nothing is configured | A comparison that stops at the first wrong byte reports how much of a guess was right, and answering faster when there is no password to check says that too |
 | A session closes after `session_timeout`, five minutes by default, and says so | A conversation somebody walked away from should not stay answerable, and one that ends in silence is indistinguishable from an assistant that broke |
 | `/stop` closes one straight away | Waiting five minutes to end a conversation you have finished is not an answer |
 | Only the last `history_limit` turns go into a prompt | A long conversation would otherwise grow a prompt without limit |

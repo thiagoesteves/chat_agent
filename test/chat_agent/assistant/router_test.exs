@@ -23,7 +23,13 @@ defmodule ChatAgent.Assistant.RouterTest do
 
   setup do
     configured = Application.get_env(:chat_agent, Assistant)
-    Application.put_env(:chat_agent, Assistant, Keyword.put(configured, :password, @password))
+
+    Application.put_env(
+      :chat_agent,
+      Assistant,
+      Keyword.put(configured, :salted_password, Pbkdf2.hash_pwd_salt(@password))
+    )
+
     on_exit(fn -> Application.put_env(:chat_agent, Assistant, configured) end)
 
     channels = Application.get_env(:chat_agent, Channel)
@@ -124,6 +130,16 @@ defmodule ChatAgent.Assistant.RouterTest do
       assert map_size(Router.sessions(router)) == 1
     end
 
+    test "checks the password against a hash, not against a password" do
+      # Nothing in the configuration is what somebody types, so reading it,
+      # the logs, or a crash dump gives no way in.
+      configured = Application.get_env(:chat_agent, Assistant)[:salted_password]
+
+      refute configured == @password
+      assert String.starts_with?(configured, "$pbkdf2")
+      assert Pbkdf2.verify_pass(@password, configured)
+    end
+
     test "answers a wrong password with nothing at all" do
       router = start_router()
 
@@ -159,7 +175,7 @@ defmodule ChatAgent.Assistant.RouterTest do
       Application.put_env(
         :chat_agent,
         Assistant,
-        Keyword.delete(Application.get_env(:chat_agent, Assistant), :password)
+        Keyword.delete(Application.get_env(:chat_agent, Assistant), :salted_password)
       )
 
       router = start_router()
