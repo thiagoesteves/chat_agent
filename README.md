@@ -162,10 +162,14 @@ It starts closed, and these are the only words it understands:
 /auth <password> --work-dir my-repo   say which checkout it works in
 /auth-<name> <password>               name the assistant
 /stop                                 close the session
+/url                                  the public URL this app is reachable on
 ```
 
 A session closes itself after five minutes of silence, and says so.
 `--work-dir` names one directory under `working_dir_root`, and nothing outside it.
+
+`/url` is the one word answered without a session, since the reason to ask where this app is reachable is usually to point something at it before there is one.
+Who may ask is the channel's allow list and nothing else: with `:allowed_chat_ids` set, those conversations and no others, and with it empty, anyone who can reach the bot.
 
 **What the assistant may do is entirely up to you, and nothing is granted by default.**
 Permissions live in the settings file named by `ChatAgent.Assistant.Claude`'s `settings` key:

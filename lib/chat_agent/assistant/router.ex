@@ -15,6 +15,12 @@ defmodule ChatAgent.Assistant.Router do
   A wrong password is answered with nothing at all. Saying "wrong password"
   would confirm that a password is what is wanted, and this listens to whoever
   can reach the bot.
+
+  `/url` is the one word answered without a session, since the usual reason to
+  ask where this app is reachable is to point something at it before there is
+  one. Who may ask is decided before this: a channel only broadcasts what came
+  from a conversation on its `:allowed_chat_ids`, and a channel with none
+  configured talks to anyone.
   """
 
   use GenServer
@@ -23,6 +29,7 @@ defmodule ChatAgent.Assistant.Router do
   alias ChatAgent.Assistant.Session
   alias ChatAgent.Channel
   alias ChatAgent.Channel.Message
+  alias ChatAgent.Tunnel
 
   require Logger
 
@@ -81,14 +88,22 @@ defmodule ChatAgent.Assistant.Router do
   def handle_info({:message, %Message{direction: :inbound} = message}, state) do
     key = {message.channel, message.conversation}
 
-    case Map.fetch(state.sessions, key) do
-      {:ok, %{pid: session}} ->
-        Session.say(session, message)
+    # Answered here rather than in the session, so that it reads the same
+    # whether a conversation has one open or not.
+    if Assistant.url?(message.text) do
+      reply(message, public_url())
 
-        {:noreply, state}
+      {:noreply, state}
+    else
+      case Map.fetch(state.sessions, key) do
+        {:ok, %{pid: session}} ->
+          Session.say(session, message)
 
-      :error ->
-        {:noreply, authenticate(state, key, message)}
+          {:noreply, state}
+
+        :error ->
+          {:noreply, authenticate(state, key, message)}
+      end
     end
   end
 
@@ -114,6 +129,17 @@ defmodule ChatAgent.Assistant.Router do
   ### ==========================================================================
   ### Private functions
   ### ==========================================================================
+
+  # The URL on its own, so that whoever asked can paste it where it is wanted.
+  # The two failures are told apart, since one is worth waiting out and the
+  # other is worth configuring.
+  defp public_url do
+    case Tunnel.url() do
+      {:ok, url} -> url
+      {:error, :not_connected} -> "No public URL yet: the tunnel is still connecting."
+      {:error, :not_configured} -> "No public URL is configured here."
+    end
+  end
 
   defp authenticate(state, key, %Message{} = message) do
     with {:ok, asked} <- Assistant.authentication(message.text),
