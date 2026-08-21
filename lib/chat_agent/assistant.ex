@@ -59,6 +59,11 @@ defmodule ChatAgent.Assistant do
   # Closing a session by hand, which does what the idle timeout does, just now.
   @stop_command "/stop"
 
+  # Asking where this app is reachable. Answered without a session, since the
+  # usual reason to ask is to point something at this app before there is one,
+  # and the channel's `:allowed_chat_ids` already decides who may ask at all.
+  @url_command "/url"
+
   @default_session_timeout :timer.minutes(5)
   @default_history_limit 20
 
@@ -176,6 +181,26 @@ defmodule ChatAgent.Assistant do
   """
   @spec stop?(text :: String.t()) :: boolean()
   def stop?(text), do: String.trim(text) == @stop_command
+
+  @doc """
+  Whether a message asks for the public URL this app is reachable on.
+
+  Kept beside `stop?/1` for the same reason it is: every word a conversation
+  can say is defined here, and nowhere else.
+
+  ## Examples
+
+      iex> ChatAgent.Assistant.url?("/url")
+      true
+
+      iex> ChatAgent.Assistant.url?("  /url  ")
+      true
+
+      iex> ChatAgent.Assistant.url?("/urls")
+      false
+  """
+  @spec url?(text :: String.t()) :: boolean()
+  def url?(text), do: String.trim(text) == @url_command
 
   @doc """
   Return a copy of `message` with any password in it replaced.

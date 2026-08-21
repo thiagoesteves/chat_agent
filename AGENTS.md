@@ -161,9 +161,15 @@ A conversation starts closed:
 /auth-<name> <password>                 name the assistant instead
 /auth <password> --work-dir my-app-folder    say where it works
 /stop                                   close the session
+/url                                    the public URL this app is reachable on
 ```
 
 Quotes are only needed for a password with a space in it.
+
+`/url` is answered by the router itself rather than by a session, so it reads the same whether a conversation has one open or not, and it is the one word that needs no password.
+What it answers is `ChatAgent.Tunnel.url/0`: the static URL where one is configured, the running tunnel's otherwise, and a sentence saying which of the two is missing when neither is there.
+The protection is the one already in front of the router: a channel only broadcasts what came from a conversation on its `:allowed_chat_ids`, so with that list set the URL goes to those conversations and no others, and with it empty the channel was already talking to anyone.
+Being answered without a password is also why it says the URL and nothing else about the machine behind it.
 
 `--work-dir` names one directory **under `working_dir_root`**, which is the prefix a conversation types the tail of: with the root set to a workspace, `--work-dir my-app-folder` means that repository and nothing else.
 Whoever knows the password picks this, so what is typed is resolved against the root and checked to have landed inside it: a name, a path climbing out with `..`, and an absolute path elsewhere are the same question, answered by where it ends up.
@@ -196,6 +202,7 @@ The router is what holds the protections, and each one exists for a reason worth
 | A guess is checked with `Pbkdf2.verify_pass/2`, and `Pbkdf2.no_user_verify/0` runs when nothing is configured | A comparison that stops at the first wrong byte reports how much of a guess was right, and answering faster when there is no password to check says that too |
 | A session closes after `session_timeout`, five minutes by default, and says so | A conversation somebody walked away from should not stay answerable, and one that ends in silence is indistinguishable from an assistant that broke |
 | `/stop` closes one straight away | Waiting five minutes to end a conversation you have finished is not an answer |
+| `/url` answers the public URL without a session, and only where a channel already listens | The URL is what somebody needs before a session is possible, and the allow list is what decides who may ask for it |
 | Only the last `history_limit` turns go into a prompt | A long conversation would otherwise grow a prompt without limit |
 | Each conversation is its own process | One slow answer would otherwise stop every other conversation from being answered |
 | Everything shown, stored or logged goes through `ChatAgent.Assistant.redact/1` | A password typed into a chat would otherwise be readable off the dashboard, out of the logs, and out of every prompt after it |

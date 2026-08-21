@@ -382,6 +382,88 @@ defmodule ChatAgent.Assistant.RouterTest do
     end
   end
 
+  describe "the public URL" do
+    setup do
+      configured = Application.get_env(:chat_agent, ChatAgent.Tunnel)
+
+      on_exit(fn -> Application.put_env(:chat_agent, ChatAgent.Tunnel, configured) end)
+
+      :ok
+    end
+
+    defp tunnel(config), do: Application.put_env(:chat_agent, ChatAgent.Tunnel, config)
+
+    test "answers a conversation that never authenticated" do
+      # Whoever is setting a webhook up needs the URL before there is a session
+      # to ask from, and the channel's allow list already decided who may ask.
+      tunnel(url: "https://example.test")
+      expect_reply("https://example.test")
+      router = start_router()
+
+      say("/url")
+
+      assert_receive {:replied, "https://example.test"}
+      assert Router.sessions(router) == %{}
+    end
+
+    test "answers a conversation with a session open, without asking the assistant" do
+      # No expectation on the assistant: Mox raises if it is asked anyway.
+      tunnel(url: "https://example.test/")
+      expect_reply("Talking to claude")
+      router = start_router()
+
+      say("/auth #{@password}")
+      assert_receive {:replied, _body}
+
+      expect_reply("https://example.test")
+      say("/url")
+
+      assert_receive {:replied, "https://example.test"}
+      # The session it was said in is untouched.
+      assert map_size(Router.sessions(router)) == 1
+    end
+
+    test "says so while a tunnel has not connected yet" do
+      tunnel(provider: ChatAgent.Tunnel.Provider.Ngrok)
+      expect_reply("still connecting")
+      start_router()
+
+      say("/url")
+
+      assert_receive {:replied, _body}
+    end
+
+    test "says so when there is no public URL at all" do
+      tunnel([])
+      expect_reply("No public URL is configured")
+      start_router()
+
+      say("/url")
+
+      assert_receive {:replied, _body}
+    end
+
+    test "is a word of its own" do
+      tunnel(url: "https://example.test")
+      expect_reply("Talking to claude")
+      router = start_router()
+
+      say("/auth #{@password}")
+      assert_receive {:replied, _body}
+
+      expect(ChatAgent.AssistantMock, :send_message, fn _conversation, prompt, _options ->
+        assert prompt == "User: /urls please"
+        {:ok, "an answer"}
+      end)
+
+      expect_reply("an answer")
+      say("/urls please")
+
+      assert_receive {:replied, _body}
+      assert map_size(Router.sessions(router)) == 1
+    end
+  end
+
   describe "messages it did not ask for" do
     test "ignores anything else sent to it" do
       router = start_router()
