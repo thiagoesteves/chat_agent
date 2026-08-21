@@ -1178,6 +1178,12 @@ html[data-theme="dark"] .channel-body.is-telegram {
   font-size: 0.875rem;
   line-height: 1.4;
   overflow-wrap: anywhere;
+  /* The text arrives as it was written, and an answer is often several lines
+   * or a list. HTML would collapse every one of those breaks into a space,
+   * so the bubble reads as one run-on paragraph while the chat app it came
+   * from shows the lines. Wrapping still applies to lines that are too long.
+   */
+  white-space: pre-wrap;
 }
 
 .message-bubble time {
