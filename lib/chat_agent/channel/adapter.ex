@@ -12,9 +12,11 @@ defmodule ChatAgent.Channel.Adapter do
       an actual chat message it returns it as a `ChatAgent.Channel.Message`,
       which `ChatAgent.Channel` broadcasts to subscribers.
     * `c:send_message/2` sends a text message back out on the same channel.
-    * `c:register_webhook/1` points the service at the URL its webhook is
+    * `c:register_webhook/2` points the service at the URL its webhook is
       served on, which is what makes a channel work behind a URL that changes
       (see `ChatAgent.Tunnel`).
+    * `c:webhook_health/0` reads back whether that service is actually
+      managing to deliver, which registration alone cannot say.
 
   ## Implementing a new channel
 
@@ -50,10 +52,17 @@ defmodule ChatAgent.Channel.Adapter do
         end
 
         @impl true
-        def register_webhook(url) do
+        def register_webhook(url, options) do
           # read what the service has registered, and only write when it
           # differs, or report {:error, :not_supported} when it has no API
-          # for this at all
+          # for this at all. With `force: true` in options, write without
+          # reading first.
+        end
+
+        @impl true
+        def webhook_health do
+          # ask the service what it thinks it is calling and how that is
+          # going, or report {:error, :not_supported} when it does not say
         end
       end
 
@@ -62,9 +71,11 @@ defmodule ChatAgent.Channel.Adapter do
   and a function clause error there turns into a failed webhook response and a
   channel-side retry.
 
-  `register_webhook/1` is asked again whenever a new public URL appears, so it
+  `register_webhook/2` is asked again whenever a new public URL appears, so it
   should read before it writes: a service that already points at the URL wants
-  `{:ok, :unchanged}`, not another write.
+  `{:ok, :unchanged}`, not another write. That shortcut is what `force: true`
+  turns off, for the case where the registration is known to be right and known
+  not to be working.
 
   `send_message/2` should decide success by whatever its own API treats as
   success. That differs per service: an HTTP status for one, a field in a 200
@@ -139,9 +150,33 @@ defmodule ChatAgent.Channel.Adapter do
 
   A service whose callback URL cannot be set over its API answers `{:error,
   :not_supported}`, which is reported once rather than retried.
+
+  ## Options
+
+    * `:force` - write the registration without reading it back first, so a
+      service that already points at `url` is told again. This is what repairs
+      a registration that is right on paper and not working in practice: a
+      service that resolved the URL once and cached the answer is only made to
+      resolve it again by being told again.
   """
-  @callback register_webhook(url :: String.t()) ::
+  @callback register_webhook(url :: String.t(), options :: keyword()) ::
               {:ok, :registered | :unchanged} | {:error, term()}
+
+  @doc """
+  Read back whether the service is managing to deliver to this app.
+
+  Called on an interval while a public URL is open (see
+  `ChatAgent.Tunnel.Server`), and the only check that catches a registration
+  which was accepted and later stopped working.
+
+  Deciding what counts as failing belongs here rather than in the caller: each
+  service reports its own idea of delivery trouble, and what those numbers are
+  worth is knowledge about that service. A service that reports nothing of the
+  sort answers `{:error, :not_supported}`, and is not asked again while the
+  URL stands.
+  """
+  @callback webhook_health() ::
+              {:ok, ChatAgent.Channel.Health.t()} | {:error, :not_supported | term()}
 
   @doc """
   Send a plain text message out on the channel.

@@ -50,6 +50,7 @@ defmodule ChatAgent.Channel do
   """
 
   alias ChatAgent.Channel.Adapter
+  alias ChatAgent.Channel.Health
   alias ChatAgent.Channel.Message
 
   require Logger
@@ -158,19 +159,45 @@ defmodule ChatAgent.Channel do
   channel's own webhook URL from it and hands that to the channel module.
 
   Returns `{:ok, :registered}` when the service was updated, `{:ok, :unchanged}`
-  when it already pointed there, and an error otherwise.
+  when it already pointed there, and an error otherwise. Pass `force: true` to
+  write the registration even where it already points here, which is how a
+  registration that is right on paper and not working in practice is repaired.
 
   ## Examples
 
       iex> ChatAgent.Channel.register_webhook(:telegram, "https://example.com")
       {:ok, :registered}
   """
-  @spec register_webhook(channel :: channel(), base_url :: String.t()) ::
+  @spec register_webhook(channel :: channel(), base_url :: String.t(), options :: keyword()) ::
           {:ok, :registered | :unchanged} | {:error, term()}
-  def register_webhook(channel, base_url) do
+  def register_webhook(channel, base_url, options \\ []) do
     case adapter(channel) do
       nil -> {:error, {:unknown_channel, channel}}
-      module -> module.register_webhook(webhook_url(channel, base_url))
+      module -> module.register_webhook(webhook_url(channel, base_url), options)
+    end
+  end
+
+  @doc """
+  Ask `channel`'s service whether it is managing to deliver to this app.
+
+  Registration says where a service was told to call; this says whether the
+  call is arriving. A channel whose service reports nothing of the sort answers
+  `{:error, :not_supported}`.
+
+  ## Examples
+
+      iex> ChatAgent.Channel.webhook_health(:telegram)
+      {:ok, %ChatAgent.Channel.Health{state: :ok}}
+
+      iex> ChatAgent.Channel.webhook_health(:carrier_pigeon)
+      {:error, {:unknown_channel, :carrier_pigeon}}
+  """
+  @spec webhook_health(channel :: channel()) ::
+          {:ok, Health.t()} | {:error, :not_supported | term()}
+  def webhook_health(channel) do
+    case adapter(channel) do
+      nil -> {:error, {:unknown_channel, channel}}
+      module -> module.webhook_health()
     end
   end
 

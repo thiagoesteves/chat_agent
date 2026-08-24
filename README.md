@@ -114,6 +114,20 @@ The strip at the top of the dashboard shows the URL, the state of the tunnel, an
 ▸ ● Connected   https://4c5b-….ngrok-free.app                     [Copy]
 ```
 
+Being told is not the same as being reached, so every minute each service is asked whether it is managing to deliver here.
+A service that is not says so in the strip without it having to be opened, along with what it has queued up and how long ago the delivery behind it failed:
+
+```
+▸ ● Not delivering   https://4c5b-….ngrok-free.app                [Copy]
+
+    telegram   https://4c5b-….ngrok-free.app/telegram/webhook
+               Not delivering · 3 queued · Connection timed out 26s ago
+```
+
+That is the failure a registration cannot report: the tunnel is up, the webhook is registered, and the service is still calling an address the URL stopped pointing at.
+The app repairs what it can on its own, telling the service again where to call and, failing that, opening a new URL, and says so in the panel when neither worked.
+`Check now` in the panel asks straight away rather than waiting for the next check.
+
 | Provider | Set up | Notes |
 |---|---|---|
 | ngrok | install the agent, then `ngrok config add-authtoken …` or set `authtoken` | A free URL changes on every restart |

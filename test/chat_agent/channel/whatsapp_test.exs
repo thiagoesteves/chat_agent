@@ -98,10 +98,21 @@ defmodule ChatAgent.Channel.WhatsappTest do
     end
   end
 
-  describe "register_webhook/1" do
+  describe "register_webhook/2" do
     test "reports that the Cloud API takes no callback URL from these credentials" do
       assert {:error, :not_supported} =
-               Whatsapp.register_webhook("https://example.com/whatsapp/webhook")
+               Whatsapp.register_webhook("https://example.com/whatsapp/webhook", [])
+    end
+
+    test "reports the same when told to write the registration anyway" do
+      assert {:error, :not_supported} =
+               Whatsapp.register_webhook("https://example.com/whatsapp/webhook", force: true)
+    end
+  end
+
+  describe "webhook_health/0" do
+    test "reports that these credentials cannot read delivery back either" do
+      assert {:error, :not_supported} = Whatsapp.webhook_health()
     end
   end
 

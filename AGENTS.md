@@ -20,6 +20,7 @@ lib/
     channel.ex              # ChatAgent.Channel, the routing facade
     channel/
       adapter.ex            # behaviour every channel implements
+      health.ex             # what a service says about delivering to us
       message.ex            # normalised inbound message struct
       whatsapp.ex           # WhatsApp channel, both directions
       telegram.ex           # Telegram channel, both directions
@@ -151,9 +152,35 @@ The agent runs under `ChatAgent.Commander.run_link/2`, which is erlexec: the OS 
 That link is why nothing here has a `terminate/3` killing the agent by hand.
 The URL is read out of the agent's stdout, buffered until a whole line is available, and handed to the provider's `parse/1`.
 
-`:registering` is where each channel is told where its webhook now lives, through `c:ChatAgent.Channel.Adapter.register_webhook/1`.
+`:registering` is where each channel is told where its webhook now lives, through `c:ChatAgent.Channel.Adapter.register_webhook/2`.
 A channel reads what its service currently has registered first and answers `{:ok, :unchanged}` when it already matches, so restarting the app is not a write to someone else's API.
 A channel whose service takes no callback URL over its API answers `{:error, :not_supported}` and is not asked again, which is what WhatsApp does: the Cloud API sets it on the app itself rather than through the messaging credentials this app holds.
+
+### Delivery health
+
+Registration is a write, and a write only says where a service was told to call.
+A URL that was registered successfully can stop working afterwards without anything in the sequence above failing: the agent still runs, the registration still reads back correct, and the service quietly cannot reach it.
+
+So `:connected` is not the end of the sequence.
+Every `:health_interval` (a minute by default) each channel is asked `c:ChatAgent.Channel.Adapter.webhook_health/0`, which answers a `ChatAgent.Channel.Health`: what the service believes it is calling, how much it has queued because it could not, and what went wrong the last time it tried.
+Whether a given report counts as failing is the channel's judgement rather than the caller's, since only the channel knows what its service reports and what those numbers are worth.
+
+A failing answer walks back up the same sequence, and the ladder is bounded:
+
+```
+connected --(failing)--> registering    (told again, with force: true)
+          --(failing)--> authenticating (a new URL entirely)
+          --(failing)--> reported, and left alone
+```
+
+`force: true` is what turns off the read-before-write shortcut, and it is the whole repair for the common case: a service that resolved the URL's host once and cached the answer only looks it up again when it is told again.
+Renewing costs the URL itself, so it is tried once; after that the failure is reported as `:delivery_failing` and nothing further is thrown away over it, though the checks carry on so a failure that ends elsewhere is still noticed.
+A healthy answer clears the count.
+
+The check runs in a process of its own, because it is a call to somebody else's API and the state machine is what every open page asks for its status.
+The URL travels with the question, so an answer about a tunnel that has since been replaced is not read as news about the current one.
+
+`Tunnel.check_health/0` is that check asked for now rather than at the next interval, which is what the dashboard's "Check now" button calls.
 
 ### Answering a conversation
 
@@ -563,6 +590,9 @@ The behaviour also carries what each service needs at its webhook: `authenticate
 request came from the provider, `inbound_messages/1` unwraps whatever envelope it uses, and
 `verify_subscription/1` answers a handshake or reports `{:error, :not_found}` when the provider
 performs none.
+`register_webhook/2` points the service here, and `webhook_health/0` reads back whether it is
+managing to deliver (see [Delivery health](#delivery-health)); a service that reports neither
+answers `{:error, :not_supported}` to both.
 Keeping all three with the channel is what lets a controller be a handful of lines that map
 results to status codes.
 

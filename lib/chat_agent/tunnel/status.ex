@@ -4,6 +4,11 @@ defmodule ChatAgent.Tunnel.Status do
 
   Broadcast on every state change (see `ChatAgent.Tunnel.subscribe/0`) and
   returned by `ChatAgent.Tunnel.status/0`.
+
+  `:webhooks` and `:health` are the two halves of whether a channel is reachable
+  and answer different questions: the first is what each service said when it
+  was told where to call, the second is what each service says about how
+  calling it has been going since.
   """
 
   @typedoc """
@@ -19,12 +24,24 @@ defmodule ChatAgent.Tunnel.Status do
   @type state ::
           :disabled | :down | :authenticating | :connecting | :registering | :connected
 
+  @typedoc """
+  What each channel reported the last time its delivery was checked, keyed by
+  channel: `{:ok, %ChatAgent.Channel.Health{}}` where the service says how it
+  is going, `{:error, :not_supported}` where it does not say at all, and
+  `{:error, reason}` where the check itself could not be made.
+
+  Empty until the first check has answered, which is a URL that has only just
+  been registered rather than one nothing is arriving on.
+  """
+  @type health :: %{optional(atom()) => {:ok, ChatAgent.Channel.Health.t()} | {:error, term()}}
+
   @type t :: %__MODULE__{
           state: state(),
           url: String.t() | nil,
           provider: module() | nil,
           error: term(),
           webhooks: %{optional(atom()) => term()},
+          health: health(),
           since: DateTime.t() | nil
         }
 
@@ -33,5 +50,6 @@ defmodule ChatAgent.Tunnel.Status do
             provider: nil,
             error: nil,
             webhooks: %{},
+            health: %{},
             since: nil
 end

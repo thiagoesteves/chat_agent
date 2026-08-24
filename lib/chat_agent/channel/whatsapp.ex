@@ -112,11 +112,20 @@ defmodule ChatAgent.Channel.Whatsapp do
   def verify_subscription(_params), do: {:error, :bad_request}
 
   @impl true
-  def register_webhook(_url) do
+  def register_webhook(_url, _options) do
     # The Cloud API takes no callback URL from the messaging credentials this
     # app holds: it is set on the app itself, either in the App dashboard or
     # through the Graph API subscriptions edge, which needs app credentials
     # rather than a phone number's access token.
+    {:error, :not_supported}
+  end
+
+  @impl true
+  def webhook_health do
+    # The same credentials that cannot set the callback URL cannot read back
+    # how it is being delivered to either, and the Cloud API keeps no queue to
+    # report: an undeliverable message is dropped after its retries rather than
+    # held for a webhook that comes back.
     {:error, :not_supported}
   end
 

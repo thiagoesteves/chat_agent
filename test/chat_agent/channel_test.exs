@@ -102,11 +102,11 @@ defmodule ChatAgent.ChannelTest do
     end
   end
 
-  describe "register_webhook/2" do
+  describe "register_webhook/3" do
     test "hands the channel its own webhook URL, built from the public one" do
       stub_channel()
 
-      expect(ChatAgent.ChannelMock, :register_webhook, fn url ->
+      expect(ChatAgent.ChannelMock, :register_webhook, fn url, _options ->
         assert url == "https://a1b2c3.ngrok-free.app/mock/webhook"
         {:ok, :registered}
       end)
@@ -115,10 +115,31 @@ defmodule ChatAgent.ChannelTest do
                Channel.register_webhook(:mock, "https://a1b2c3.ngrok-free.app")
     end
 
+    test "reads the registration back before writing it, unless told not to" do
+      stub_channel()
+
+      expect(ChatAgent.ChannelMock, :register_webhook, fn _url, options ->
+        assert options == []
+        {:ok, :unchanged}
+      end)
+
+      assert {:ok, :unchanged} = Channel.register_webhook(:mock, "https://example.com")
+
+      expect(ChatAgent.ChannelMock, :register_webhook, fn _url, options ->
+        assert options == [force: true]
+        {:ok, :registered}
+      end)
+
+      assert {:ok, :registered} =
+               Channel.register_webhook(:mock, "https://example.com", force: true)
+    end
+
     test "returns the channel result unchanged" do
       stub_channel()
 
-      expect(ChatAgent.ChannelMock, :register_webhook, fn _url -> {:error, :not_supported} end)
+      expect(ChatAgent.ChannelMock, :register_webhook, fn _url, _options ->
+        {:error, :not_supported}
+      end)
 
       assert {:error, :not_supported} = Channel.register_webhook(:mock, "https://example.com")
     end
@@ -126,6 +147,31 @@ defmodule ChatAgent.ChannelTest do
     test "reports a channel with no module configured" do
       assert {:error, {:unknown_channel, :carrier_pigeon}} =
                Channel.register_webhook(:carrier_pigeon, "https://example.com")
+    end
+  end
+
+  describe "webhook_health/1" do
+    test "asks the channel how delivery is going" do
+      stub_channel()
+
+      health = %ChatAgent.Channel.Health{state: :ok, pending: 0}
+
+      expect(ChatAgent.ChannelMock, :webhook_health, fn -> {:ok, health} end)
+
+      assert {:ok, ^health} = Channel.webhook_health(:mock)
+    end
+
+    test "returns the channel result unchanged" do
+      stub_channel()
+
+      expect(ChatAgent.ChannelMock, :webhook_health, fn -> {:error, :not_supported} end)
+
+      assert {:error, :not_supported} = Channel.webhook_health(:mock)
+    end
+
+    test "reports a channel with no module configured" do
+      assert {:error, {:unknown_channel, :carrier_pigeon}} =
+               Channel.webhook_health(:carrier_pigeon)
     end
   end
 
