@@ -331,7 +331,7 @@ defmodule ChatAgent.Channel.Telegram do
   defp request_error({:error, exception}), do: {:error, exception}
 
   # What the Bot API currently calls, which is empty when no webhook is set.
-  defp current_webhook_url do
+  def current_webhook_url do
     # Registration is retried by the caller with a backoff (see
     # `ChatAgent.Tunnel.Server`), so Req retrying underneath it only delays
     # that, and holds up whoever asked in the meantime.

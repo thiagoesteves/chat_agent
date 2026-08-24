@@ -161,15 +161,18 @@ It starts closed, and these are the only words it understands:
 /auth <password>                      open a session on the default assistant
 /auth <password> --work-dir my-repo   say which checkout it works in
 /auth-<name> <password>               name the assistant
+/auth <password> --url                the public URL this app is reachable on
+/auth <password> --renew              open a new public URL, and say so
 /stop                                 close the session
-/url                                  the public URL this app is reachable on
 ```
 
 A session closes itself after five minutes of silence, and says so.
 `--work-dir` names one directory under `working_dir_root`, and nothing outside it.
 
-`/url` is the one word answered without a session, since the reason to ask where this app is reachable is usually to point something at it before there is one.
-Who may ask is the channel's allow list and nothing else: with `:allowed_chat_ids` set, those conversations and no others, and with it empty, anyone who can reach the bot.
+`--url` and `--renew` open no session and close none: they are the password spent on one answer about the public URL instead of on a conversation.
+Both are answered whether or not a session is open, which is what makes them useful before there is one, and both cost the password, so nobody who merely found the bot learns where it lives.
+`--renew` runs the tunnel agent again, which is how a free tunnel is asked for another URL; it says so as soon as the tunnel has been told, and the new URL is there to be asked for with `--url` a moment later.
+It answers that there is nothing to renew where the public URL is a static one, since a deployment behind DNS is reachable at the same place tomorrow.
 
 **What the assistant may do is entirely up to you, and nothing is granted by default.**
 Permissions live in the settings file named by `ChatAgent.Assistant.Claude`'s `settings` key:

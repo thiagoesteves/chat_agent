@@ -102,6 +102,23 @@ defmodule ChatAgent.Tunnel do
   end
 
   @doc """
+  Open a new public URL, by running the tunnel agent again.
+
+  Answers `{:error, :not_configured}` where the URL is a static one, since
+  there is no agent to run and a deployment behind DNS is reachable at the same
+  place tomorrow. Answers `{:error, :down}` where an agent is configured but
+  its server is not running.
+
+  Returns as soon as the tunnel has been told to start over. The new URL
+  arrives on the topic (see `subscribe/0`) once the service has given one, and
+  `url/0` answers it from then on.
+  """
+  @spec renew() :: :ok | {:error, :not_configured | :down}
+  def renew do
+    if enabled?(), do: Server.renew(), else: {:error, :not_configured}
+  end
+
+  @doc """
   Whether a tunnel agent is run at all.
 
   A statically configured URL is already public, so an agent would have

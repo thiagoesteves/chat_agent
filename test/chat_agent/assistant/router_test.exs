@@ -393,14 +393,14 @@ defmodule ChatAgent.Assistant.RouterTest do
 
     defp tunnel(config), do: Application.put_env(:chat_agent, ChatAgent.Tunnel, config)
 
-    test "answers a conversation that never authenticated" do
+    test "answers a conversation that knows the password, without opening a session" do
       # Whoever is setting a webhook up needs the URL before there is a session
-      # to ask from, and the channel's allow list already decided who may ask.
+      # to ask from, and the password is what says they may have it.
       tunnel(url: "https://example.test")
       expect_reply("https://example.test")
       router = start_router()
 
-      say("/url")
+      say("/auth #{@password} --url")
 
       assert_receive {:replied, "https://example.test"}
       assert Router.sessions(router) == %{}
@@ -416,11 +416,23 @@ defmodule ChatAgent.Assistant.RouterTest do
       assert_receive {:replied, _body}
 
       expect_reply("https://example.test")
-      say("/url")
+      say("/auth #{@password} --url")
 
       assert_receive {:replied, "https://example.test"}
       # The session it was said in is untouched.
       assert map_size(Router.sessions(router)) == 1
+    end
+
+    test "answers a wrong password with nothing at all" do
+      # The same silence a wrong password gets anywhere else: saying "wrong
+      # password" is what confirms to whoever is guessing that one opens this.
+      tunnel(url: "https://example.test")
+      router = start_router()
+
+      say("/auth not-the-password --url")
+
+      _ = :sys.get_state(router)
+      assert Router.sessions(router) == %{}
     end
 
     test "says so while a tunnel has not connected yet" do
@@ -428,7 +440,7 @@ defmodule ChatAgent.Assistant.RouterTest do
       expect_reply("still connecting")
       start_router()
 
-      say("/url")
+      say("/auth #{@password} --url")
 
       assert_receive {:replied, _body}
     end
@@ -438,12 +450,12 @@ defmodule ChatAgent.Assistant.RouterTest do
       expect_reply("No public URL is configured")
       start_router()
 
-      say("/url")
+      say("/auth #{@password} --url")
 
       assert_receive {:replied, _body}
     end
 
-    test "is a word of its own" do
+    test "is not the word on its own, which a session hears as anything else" do
       tunnel(url: "https://example.test")
       expect_reply("Talking to claude")
       router = start_router()
@@ -452,15 +464,108 @@ defmodule ChatAgent.Assistant.RouterTest do
       assert_receive {:replied, _body}
 
       expect(ChatAgent.AssistantMock, :send_message, fn _conversation, prompt, _options ->
-        assert prompt == "User: /urls please"
+        assert prompt == "User: /url please"
         {:ok, "an answer"}
       end)
 
       expect_reply("an answer")
-      say("/urls please")
+      say("/url please")
 
       assert_receive {:replied, _body}
       assert map_size(Router.sessions(router)) == 1
+    end
+  end
+
+  describe "renewing the public URL" do
+    setup do
+      configured = Application.get_env(:chat_agent, ChatAgent.Tunnel)
+
+      on_exit(fn -> Application.put_env(:chat_agent, ChatAgent.Tunnel, configured) end)
+
+      :ok
+    end
+
+    # Standing in for the state machine under the name it registers, since what
+    # is under test here is what the router asks for and what it says about the
+    # answer, not what opening a tunnel does. `ChatAgent.Tunnel.Server` has its
+    # own test for that.
+    defp tunnel_server(answer) do
+      test_process = self()
+
+      pid =
+        spawn_link(fn ->
+          receive do
+            {:"$gen_call", from, :renew} ->
+              send(test_process, :renew_asked)
+              :gen.reply(from, answer)
+          end
+        end)
+
+      Process.register(pid, ChatAgent.Tunnel.Server)
+
+      pid
+    end
+
+    test "runs the tunnel again, and opens no session doing it" do
+      tunnel(provider: ChatAgent.Tunnel.Provider.Ngrok)
+      tunnel_server(:ok)
+      expect_reply("Renewing the public URL")
+      router = start_router()
+
+      say("/auth #{@password} --renew")
+
+      assert_receive :renew_asked
+      assert_receive {:replied, _body}
+      assert Router.sessions(router) == %{}
+    end
+
+    test "says so when a tunnel is configured but is not running" do
+      tunnel(provider: ChatAgent.Tunnel.Provider.Ngrok)
+      expect_reply("No tunnel is running here")
+      start_router()
+
+      say("/auth #{@password} --renew")
+
+      assert_receive {:replied, _body}
+    end
+
+    test "says so when the URL is a static one, which no agent opened" do
+      tunnel(url: "https://example.test")
+      expect_reply("nothing to renew")
+      start_router()
+
+      say("/auth #{@password} --renew")
+
+      assert_receive {:replied, _body}
+    end
+
+    test "answers a wrong password with nothing at all, and renews nothing" do
+      tunnel(provider: ChatAgent.Tunnel.Provider.Ngrok)
+      tunnel_server(:ok)
+      router = start_router()
+
+      say("/auth not-the-password --renew")
+
+      _ = :sys.get_state(router)
+      refute_received :renew_asked
+      assert Router.sessions(router) == %{}
+    end
+
+    test "leaves a session that asked for it exactly as it was" do
+      tunnel(url: "https://example.test")
+      expect_reply("Talking to claude")
+      router = start_router()
+
+      say("/auth #{@password}")
+      assert_receive {:replied, _body}
+
+      sessions = Router.sessions(router)
+
+      expect_reply("nothing to renew")
+      say("/auth #{@password} --renew")
+
+      assert_receive {:replied, _body}
+      assert Router.sessions(router) == sessions
     end
   end
 

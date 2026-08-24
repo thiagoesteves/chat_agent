@@ -366,6 +366,84 @@ defmodule ChatAgent.Tunnel.ServerTest do
     end
   end
 
+  describe "renew/1" do
+    test "stops the agent and opens another tunnel, which is another URL" do
+      test_process = self()
+
+      expect(CommanderMock, :run_link, 2, fn _command, _options -> start_agent() end)
+
+      expect(CommanderMock, :stop, fn os_pid ->
+        send(test_process, {:stopped, os_pid})
+        :ok
+      end)
+
+      expect(ChatAgent.ChannelMock, :register_webhook, 2, fn url ->
+        send(test_process, {:register_webhook, url})
+        {:ok, :registered}
+      end)
+
+      server = start_server()
+      agent_says(server, url_line(@url))
+      assert_receive {:tunnel, %Status{state: :connected, url: @url}}
+      assert_receive {:register_webhook, _url}
+
+      assert :ok = Server.renew(server)
+
+      # The agent it had is stopped, and the URL it had goes with it: what the
+      # service handed out is gone before another is asked for.
+      assert_receive {:stopped, @os_pid}
+      assert_receive {:tunnel, %Status{state: :authenticating, url: nil}}
+
+      renewed = "https://d4e5f6.ngrok-free.app"
+      webhook = "#{renewed}/mock/webhook"
+      agent_says(server, url_line(renewed))
+
+      assert_receive {:register_webhook, ^webhook}
+      assert_receive {:tunnel, %Status{state: :connected, url: ^renewed}}
+    end
+
+    test "runs the next attempt straight away, rather than after the backoff" do
+      # A tunnel that has been failing has a backoff built up. Somebody asking
+      # for a new URL is not that retry, and should not wait through it.
+      expect(TunnelProviderMock, :authenticate, fn -> {:error, :no_credentials} end)
+
+      server = start_server(max_backoff: 30_000)
+
+      assert_receive {:tunnel, %Status{state: :authenticating, error: nil}}
+      # The next attempt of its own is now seconds away.
+      assert_receive {:tunnel, %Status{state: :authenticating, error: :no_credentials}}
+
+      expect(CommanderMock, :run_link, fn _command, _options -> start_agent() end)
+      stub(TunnelProviderMock, :authenticate, fn -> :ok end)
+
+      assert :ok = Server.renew(server)
+
+      # Without the reset this waits out a backoff measured in seconds.
+      assert_receive {:tunnel, %Status{state: :authenticating, error: nil}}, 500
+      assert_receive {:tunnel, %Status{state: :connecting}}, 500
+    end
+
+    test "is answerable before there is an agent to stop" do
+      expect(TunnelProviderMock, :authenticate, fn -> {:error, :no_credentials} end)
+      stub(CommanderMock, :stop, fn _os_pid -> flunk("stopped an agent that never ran") end)
+
+      server = start_server(max_backoff: 30_000)
+
+      assert_receive {:tunnel, %Status{state: :authenticating, error: :no_credentials}}
+
+      stub(TunnelProviderMock, :authenticate, fn -> :ok end)
+      expect(CommanderMock, :run_link, fn _command, _options -> start_agent() end)
+
+      assert :ok = Server.renew(server)
+
+      assert_receive {:tunnel, %Status{state: :connecting}}, 500
+    end
+
+    test "reports a server that is not running, rather than raising" do
+      assert {:error, :down} = Server.renew(:no_such_tunnel)
+    end
+  end
+
   ### ==========================================================================
   ### Helpers
   ### ==========================================================================

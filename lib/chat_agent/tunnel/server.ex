@@ -17,6 +17,10 @@ defmodule ChatAgent.Tunnel.Server do
   the number of consecutive attempts and is capped by `:max_backoff`, so a
   service that is down does not turn into a spin.
 
+  `renew/1` is that same return asked for rather than waited for: the agent is
+  stopped and the sequence runs again, which is how a new public URL is
+  obtained from a service that hands out whichever one it likes.
+
   The agent runs under `ChatAgent.Commander.run_link/2`, which links it to this
   process: with `trap_exit` set, the agent going down arrives as a message here
   rather than as an orphaned OS process, and this process going down takes the
@@ -97,6 +101,25 @@ defmodule ChatAgent.Tunnel.Server do
     :exit, _reason -> %Status{state: :down}
   end
 
+  @doc """
+  Throw the current tunnel away and open another one.
+
+  The agent is stopped and the whole sequence runs again from
+  `:authenticating`, which is what hands out a new URL: a free tunnel's URL is
+  whatever the service gave it, and the only way to be given another is to ask
+  again.
+
+  Answers as soon as the sequence has been started rather than when it
+  finishes, since opening a tunnel takes as long as the service takes and the
+  URL is announced on the topic anyway.
+  """
+  @spec renew(server :: :gen_statem.server_ref()) :: :ok | {:error, :down}
+  def renew(server \\ __MODULE__) do
+    :gen_statem.call(server, :renew)
+  catch
+    :exit, _reason -> {:error, :down}
+  end
+
   ### ==========================================================================
   ### Callback functions
   ### ==========================================================================
@@ -136,6 +159,28 @@ defmodule ChatAgent.Tunnel.Server do
   @impl true
   def handle_event({:call, from}, :status, state, data) do
     {:keep_state_and_data, [{:reply, from, status(state, data)}]}
+  end
+
+  # --- Renewing, which is the whole sequence again ----------------------------
+
+  # The attempt count goes back to zero along with the agent, so the backoff a
+  # failing tunnel had built up is not what somebody asking for a new URL waits
+  # through: this is an attempt that was asked for, not one that retried.
+  def handle_event({:call, from}, :renew, state, data) do
+    Logger.info(%{what: "tunnel_renew_requested", provider: data.provider.name(), from: state})
+
+    data = %{stop_agent(data) | url: nil, webhooks: %{}, attempts: 0, error: nil}
+    reply = [{:reply, from, :ok}]
+
+    # A transition to the state it is already in is not a transition: neither
+    # the enter callback nor its timer would run again, and the renew would
+    # wait out the backoff it just threw away. `:repeat_state` is that same
+    # move made deliberately.
+    if state == :authenticating do
+      {:repeat_state, data, reply}
+    else
+      {:next_state, :authenticating, data, reply}
+    end
   end
 
   # --- Authenticating --------------------------------------------------------
@@ -349,6 +394,9 @@ defmodule ChatAgent.Tunnel.Server do
 
     {Enum.reject(complete, &(&1 == "")), rest}
   end
+
+  # Nothing to stop between attempts, which is where a renew can arrive.
+  defp stop_agent(%{os_pid: nil} = data), do: data
 
   defp stop_agent(%{os_pid: os_pid} = data) do
     Commander.stop(os_pid)

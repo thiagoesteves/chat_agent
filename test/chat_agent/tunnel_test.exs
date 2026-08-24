@@ -96,6 +96,27 @@ defmodule ChatAgent.TunnelTest do
     end
   end
 
+  describe "renew/0" do
+    test "refuses where the URL is a static one, which no agent opened" do
+      # A deployment behind DNS is reachable at the same place tomorrow, so
+      # there is no agent to run again.
+      configure(url: "https://chat.example.com")
+      assert Tunnel.renew() == {:error, :not_configured}
+
+      configure(provider: ChatAgent.TunnelProviderMock, url: "https://chat.example.com")
+      assert Tunnel.renew() == {:error, :not_configured}
+
+      configure([])
+      assert Tunnel.renew() == {:error, :not_configured}
+    end
+
+    test "reports a tunnel that is configured but not running" do
+      configure(provider: ChatAgent.TunnelProviderMock)
+
+      assert Tunnel.renew() == {:error, :down}
+    end
+  end
+
   describe "connected?/0" do
     test "is true whenever a URL is available" do
       configure(url: "https://chat.example.com")
