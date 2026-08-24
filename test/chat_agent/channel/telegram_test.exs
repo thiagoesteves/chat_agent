@@ -3,6 +3,7 @@ defmodule ChatAgent.Channel.TelegramTest do
 
   import Plug.Test, only: [conn: 3]
 
+  alias ChatAgent.Channel.Health
   alias ChatAgent.Channel.Message
   alias ChatAgent.Channel.Telegram
 
@@ -440,7 +441,7 @@ defmodule ChatAgent.Channel.TelegramTest do
     end
   end
 
-  describe "register_webhook/1" do
+  describe "register_webhook/2" do
     test "sets the webhook, with the configured secret, when it points elsewhere" do
       test_process = self()
 
@@ -457,7 +458,7 @@ defmodule ChatAgent.Channel.TelegramTest do
       end)
 
       assert {:ok, :registered} =
-               Telegram.register_webhook("https://a1b2c3.ngrok-free.app/telegram/webhook")
+               Telegram.register_webhook("https://a1b2c3.ngrok-free.app/telegram/webhook", [])
 
       assert_receive {:set_webhook, payload}
       assert payload["url"] == "https://a1b2c3.ngrok-free.app/telegram/webhook"
@@ -484,7 +485,7 @@ defmodule ChatAgent.Channel.TelegramTest do
       end)
 
       assert {:ok, :registered} =
-               Telegram.register_webhook("https://example.com/telegram/webhook")
+               Telegram.register_webhook("https://example.com/telegram/webhook", [])
 
       assert_receive {:set_webhook, payload}
       refute Map.has_key?(payload, "secret_token")
@@ -501,7 +502,7 @@ defmodule ChatAgent.Channel.TelegramTest do
       end)
 
       assert {:ok, :unchanged} =
-               Telegram.register_webhook("https://a1b2c3.ngrok-free.app/telegram/webhook")
+               Telegram.register_webhook("https://a1b2c3.ngrok-free.app/telegram/webhook", [])
     end
 
     test "reports a failure reading what is registered" do
@@ -510,7 +511,7 @@ defmodule ChatAgent.Channel.TelegramTest do
       end)
 
       assert {:error, {:telegram_error, "Unauthorized"}} =
-               Telegram.register_webhook("https://example.com/telegram/webhook")
+               Telegram.register_webhook("https://example.com/telegram/webhook", [])
     end
 
     test "reports a failure setting the webhook" do
@@ -525,21 +526,137 @@ defmodule ChatAgent.Channel.TelegramTest do
       end)
 
       assert {:error, {:telegram_error, "bad webhook: HTTPS required"}} =
-               Telegram.register_webhook("http://example.com/telegram/webhook")
+               Telegram.register_webhook("http://example.com/telegram/webhook", [])
     end
 
     test "reports a transport error" do
       Req.Test.stub(Telegram, fn conn -> Req.Test.transport_error(conn, :econnrefused) end)
 
       assert {:error, %Req.TransportError{reason: :econnrefused}} =
-               Telegram.register_webhook("https://example.com/telegram/webhook")
+               Telegram.register_webhook("https://example.com/telegram/webhook", [])
     end
 
     test "reports an answer it does not recognise" do
       Req.Test.stub(Telegram, fn conn -> Req.Test.json(conn, %{"ok" => true}) end)
 
       assert {:error, :unexpected_response} =
-               Telegram.register_webhook("https://example.com/telegram/webhook")
+               Telegram.register_webhook("https://example.com/telegram/webhook", [])
+    end
+  end
+
+  describe "register_webhook/2, forced" do
+    test "writes the registration without reading back where it points" do
+      test_process = self()
+
+      Req.Test.stub(Telegram, fn conn ->
+        case conn.request_path do
+          "/bottest_telegram_bot_token/getWebhookInfo" ->
+            flunk("read the registration back on a forced write")
+
+          "/bottest_telegram_bot_token/setWebhook" ->
+            {:ok, body, conn} = Plug.Conn.read_body(conn)
+            send(test_process, {:set_webhook, Jason.decode!(body)})
+            Req.Test.json(conn, %{"ok" => true, "result" => true})
+        end
+      end)
+
+      # The URL the Bot API already has. Writing it again is the whole point:
+      # that is what makes it resolve the host afresh.
+      assert {:ok, :registered} =
+               Telegram.register_webhook("https://a1b2c3.ngrok-free.app/telegram/webhook",
+                 force: true
+               )
+
+      assert_receive {:set_webhook, payload}
+      assert payload["url"] == "https://a1b2c3.ngrok-free.app/telegram/webhook"
+    end
+  end
+
+  describe "webhook_health/0" do
+    test "reports a service that is delivering" do
+      stub_webhook_info(%{
+        "url" => "https://a1b2c3.ngrok-free.app/telegram/webhook",
+        "pending_update_count" => 0,
+        "ip_address" => "3.125.223.134"
+      })
+
+      assert {:ok, %Health{} = health} = Telegram.webhook_health()
+      assert health.state == :ok
+      assert health.url == "https://a1b2c3.ngrok-free.app/telegram/webhook"
+      assert health.pending == 0
+      assert health.last_error == nil
+      assert health.details == %{"ip_address" => "3.125.223.134"}
+      assert %DateTime{} = health.checked_at
+    end
+
+    test "reports a queue held behind a failure that has just happened" do
+      failed_at = DateTime.utc_now() |> DateTime.add(-26, :second) |> DateTime.to_unix()
+
+      stub_webhook_info(%{
+        "url" => "https://a1b2c3.ngrok-free.app/telegram/webhook",
+        "pending_update_count" => 3,
+        "last_error_date" => failed_at,
+        "last_error_message" => "Connection timed out"
+      })
+
+      assert {:ok, %Health{} = health} = Telegram.webhook_health()
+      assert health.state == :failing
+      assert health.pending == 3
+      assert health.last_error == "Connection timed out"
+      assert DateTime.to_unix(health.last_error_at) == failed_at
+    end
+
+    # The Bot API reports the last failure there ever was, not a current one,
+    # and goes on reporting it long after the delivery that followed it worked.
+    test "does not read a failure the service has since recovered from as one" do
+      stub_webhook_info(%{
+        "url" => "https://a1b2c3.ngrok-free.app/telegram/webhook",
+        "pending_update_count" => 0,
+        "last_error_date" => DateTime.utc_now() |> DateTime.to_unix(),
+        "last_error_message" => "Connection timed out"
+      })
+
+      assert {:ok, %Health{state: :ok, last_error: "Connection timed out"}} =
+               Telegram.webhook_health()
+    end
+
+    test "does not read an old failure as one that is happening now" do
+      failed_at = DateTime.utc_now() |> DateTime.add(-2, :day) |> DateTime.to_unix()
+
+      stub_webhook_info(%{
+        "url" => "https://a1b2c3.ngrok-free.app/telegram/webhook",
+        "pending_update_count" => 5,
+        "last_error_date" => failed_at,
+        "last_error_message" => "Wrong response from the webhook: 502 Bad Gateway"
+      })
+
+      assert {:ok, %Health{state: :ok, pending: 5}} = Telegram.webhook_health()
+    end
+
+    test "reports a queue with no failure behind it as delivery in progress" do
+      # Updates arriving faster than they are handed over, which is a busy
+      # webhook rather than a broken one: nothing has failed at all.
+      stub_webhook_info(%{
+        "url" => "https://a1b2c3.ngrok-free.app/telegram/webhook",
+        "pending_update_count" => 4
+      })
+
+      assert {:ok, %Health{state: :ok, pending: 4, last_error_at: nil}} =
+               Telegram.webhook_health()
+    end
+
+    test "reports no URL at all, rather than an empty one" do
+      stub_webhook_info(%{"url" => "", "pending_update_count" => 0})
+
+      assert {:ok, %Health{url: nil}} = Telegram.webhook_health()
+    end
+
+    test "reports a check that could not be made" do
+      Req.Test.stub(Telegram, fn conn ->
+        Req.Test.json(conn, %{"ok" => false, "description" => "Unauthorized"})
+      end)
+
+      assert {:error, {:telegram_error, "Unauthorized"}} = Telegram.webhook_health()
     end
   end
 
@@ -616,5 +733,17 @@ defmodule ChatAgent.Channel.TelegramTest do
     test "rejects a body that is not an update" do
       assert {:error, :bad_request} = Telegram.inbound_messages(%{})
     end
+  end
+
+  ### ==========================================================================
+  ### Helpers
+  ### ==========================================================================
+
+  defp stub_webhook_info(result) do
+    Req.Test.stub(Telegram, fn conn ->
+      assert conn.request_path == "/bottest_telegram_bot_token/getWebhookInfo"
+
+      Req.Test.json(conn, %{"ok" => true, "result" => result})
+    end)
   end
 end

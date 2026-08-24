@@ -7,6 +7,11 @@ defmodule ChatAgent.Assistant.Router do
   on the conversation belongs to a `ChatAgent.Assistant.Session` process, which
   holds it and answers it; this router only decides who gets one.
 
+  `/auth <password> --url` and `/auth <password> --renew` are the same password
+  spent on one answer about the public URL instead of on a session. They open
+  nothing, they close nothing, and they are answered here rather than in a
+  session, so they read the same whether a conversation has one open or not.
+
   That split is what keeps the router quick: asking an assistant takes as long
   as the assistant takes, and it happens in the session's process, so a
   conversation waiting on a slow answer never delays another conversation's
@@ -14,13 +19,9 @@ defmodule ChatAgent.Assistant.Router do
 
   A wrong password is answered with nothing at all. Saying "wrong password"
   would confirm that a password is what is wanted, and this listens to whoever
-  can reach the bot.
-
-  `/url` is the one word answered without a session, since the usual reason to
-  ask where this app is reachable is to point something at it before there is
-  one. Who may ask is decided before this: a channel only broadcasts what came
-  from a conversation on its `:allowed_chat_ids`, and a channel with none
-  configured talks to anyone.
+  can reach the bot. That is true of every form of it, so asking for the URL
+  with the wrong password is met with the same silence as asking for a session
+  with it.
   """
 
   use GenServer
@@ -87,23 +88,26 @@ defmodule ChatAgent.Assistant.Router do
   @impl true
   def handle_info({:message, %Message{direction: :inbound} = message}, state) do
     key = {message.channel, message.conversation}
+    attempt = Assistant.authentication(message.text)
 
-    # Answered here rather than in the session, so that it reads the same
-    # whether a conversation has one open or not.
-    if Assistant.url?(message.text) do
-      reply(message, public_url())
+    case attempt do
+      # A question about the public URL, which is nothing to do with a session:
+      # it is answered before one is looked for, so a conversation with a
+      # session open gets the URL rather than an assistant's opinion of it, and
+      # the session it was asked from is left exactly as it was.
+      {:ok, %{action: action} = asked} when action != :open ->
+        {:noreply, tunnel(state, asked, message)}
 
-      {:noreply, state}
-    else
-      case Map.fetch(state.sessions, key) do
-        {:ok, %{pid: session}} ->
-          Session.say(session, message)
+      _session_or_nothing ->
+        case Map.fetch(state.sessions, key) do
+          {:ok, %{pid: session}} ->
+            Session.say(session, message)
 
-          {:noreply, state}
+            {:noreply, state}
 
-        :error ->
-          {:noreply, authenticate(state, key, message)}
-      end
+          :error ->
+            {:noreply, authenticate(state, key, attempt, message)}
+        end
     end
   end
 
@@ -130,6 +134,17 @@ defmodule ChatAgent.Assistant.Router do
   ### Private functions
   ### ==========================================================================
 
+  # Answered only to whoever knows the password, and the state is handed
+  # straight back: neither of these opens, closes, or touches a session.
+  defp tunnel(state, asked, %Message{} = message) do
+    if correct?(asked.password), do: reply(message, tunnel_answer(asked.action))
+
+    state
+  end
+
+  defp tunnel_answer(:url), do: public_url()
+  defp tunnel_answer(:renew), do: renewed_url()
+
   # The URL on its own, so that whoever asked can paste it where it is wanted.
   # The two failures are told apart, since one is worth waiting out and the
   # other is worth configuring.
@@ -141,9 +156,27 @@ defmodule ChatAgent.Assistant.Router do
     end
   end
 
-  defp authenticate(state, key, %Message{} = message) do
-    with {:ok, asked} <- Assistant.authentication(message.text),
-         true <- correct?(asked.password),
+  # Said as soon as the tunnel has been told to start over rather than when it
+  # has, since opening one takes as long as the service takes and waiting here
+  # would be the router waiting: the URL is asked for again once it exists.
+  defp renewed_url do
+    case Tunnel.renew() do
+      :ok ->
+        "Renewing the public URL. Ask for it with --url in a moment."
+
+      {:error, :not_configured} ->
+        "The public URL here is not a tunnel, so there is nothing to renew."
+
+      {:error, :down} ->
+        "No tunnel is running here."
+    end
+  end
+
+  # Nothing that could open a session, said by a conversation that has none.
+  defp authenticate(state, _key, :error, _message), do: state
+
+  defp authenticate(state, key, {:ok, asked}, %Message{} = message) do
+    with true <- correct?(asked.password),
          {:ok, assistant} <- resolve(asked.assistant),
          {:ok, working_dir} <- working_dir(asked.work_dir) do
       open(state, key, assistant, working_dir, message)

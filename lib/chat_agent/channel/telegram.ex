@@ -27,9 +27,18 @@ defmodule ChatAgent.Channel.Telegram do
   @behaviour ChatAgent.Channel.Adapter
 
   alias ChatAgent.Channel
+  alias ChatAgent.Channel.Health
   alias ChatAgent.Channel.Message
 
   require Logger
+
+  # How recent a failed delivery has to be for the Bot API's own account of it
+  # to describe what is happening now rather than what happened once.
+  @failing_within 120
+
+  # A health check is polled on an interval, so a request that hangs should
+  # give up well inside it rather than pile up behind the next one.
+  @info_timeout :timer.seconds(10)
 
   ### ==========================================================================
   ### Callback functions
@@ -113,16 +122,30 @@ defmodule ChatAgent.Channel.Telegram do
   end
 
   @impl true
-  def register_webhook(url) do
-    case current_webhook_url() do
-      {:ok, ^url} ->
-        {:ok, :unchanged}
+  def register_webhook(url, options) do
+    if Keyword.get(options, :force, false) do
+      # Told again on purpose. `setWebhook` is what makes the Bot API resolve
+      # the host afresh, which is the whole repair when it is still dialling an
+      # address the name has since stopped pointing at.
+      set_webhook(url)
+    else
+      case current_webhook_url() do
+        {:ok, ^url} ->
+          {:ok, :unchanged}
 
-      {:ok, _other} ->
-        set_webhook(url)
+        {:ok, _other} ->
+          set_webhook(url)
 
-      {:error, reason} ->
-        {:error, reason}
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
+  end
+
+  @impl true
+  def webhook_health do
+    with {:ok, info} <- webhook_info() do
+      {:ok, health(info)}
     end
   end
 
@@ -331,21 +354,70 @@ defmodule ChatAgent.Channel.Telegram do
   defp request_error({:error, exception}), do: {:error, exception}
 
   # What the Bot API currently calls, which is empty when no webhook is set.
-  defp current_webhook_url do
+  def current_webhook_url do
+    with {:ok, info} <- webhook_info() do
+      {:ok, info["url"] || ""}
+    end
+  end
+
+  # `getWebhookInfo` answers both questions this channel asks of a
+  # registration: where it points, and how delivering to it has been going.
+  defp webhook_info do
     # Registration is retried by the caller with a backoff (see
     # `ChatAgent.Tunnel.Server`), so Req retrying underneath it only delays
-    # that, and holds up whoever asked in the meantime.
+    # that, and holds up whoever asked in the meantime. The receive timeout is
+    # what keeps a health check from outliving the interval it is polled on.
     "getWebhookInfo"
     |> api_url()
-    |> Req.get(request_options(retry: false))
+    |> Req.get(request_options(retry: false, receive_timeout: @info_timeout))
     |> case do
       {:ok, %Req.Response{body: %{"ok" => true, "result" => result}}} ->
-        {:ok, result["url"] || ""}
+        {:ok, result}
 
       other ->
         registration_error(other)
     end
   end
+
+  defp health(info) do
+    pending = info["pending_update_count"] || 0
+    last_error_at = timestamp(info["last_error_date"])
+
+    %Health{
+      state: delivery_state(pending, last_error_at),
+      url: presence(info["url"]),
+      pending: pending,
+      last_error: info["last_error_message"],
+      last_error_at: last_error_at,
+      checked_at: DateTime.utc_now(),
+      # The address the Bot API resolved this bot's webhook host to, which is
+      # worth showing beside a timeout: a name that has moved on since is
+      # exactly what a stuck queue looks like from here.
+      details: Map.take(info, ["ip_address", "max_connections"])
+    }
+  end
+
+  # Neither number is worth acting on by itself. `last_error_date` is the last
+  # failure there ever was rather than a current one, and survives the recovery
+  # that followed it; a queue of one is a message that arrived a moment ago. A
+  # queue that is not empty *and* an attempt that failed just now is the pair
+  # that means updates are being written down instead of delivered.
+  defp delivery_state(0, _last_error_at), do: :ok
+  defp delivery_state(_pending, nil), do: :ok
+
+  defp delivery_state(_pending, last_error_at) do
+    if DateTime.diff(DateTime.utc_now(), last_error_at) <= @failing_within do
+      :failing
+    else
+      :ok
+    end
+  end
+
+  defp timestamp(seconds) when is_integer(seconds), do: DateTime.from_unix!(seconds)
+  defp timestamp(_absent), do: nil
+
+  defp presence(""), do: nil
+  defp presence(value), do: value
 
   # The secret token is sent with the URL, since the Bot API takes both in the
   # same call. It is not reported back by `getWebhookInfo`, so changing the

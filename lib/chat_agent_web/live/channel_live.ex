@@ -11,6 +11,7 @@ defmodule ChatAgentWeb.ChannelLive do
 
   alias ChatAgent.Assistant
   alias ChatAgent.Channel
+  alias ChatAgent.Channel.Health
   alias ChatAgent.Channel.Message
   alias ChatAgent.Tunnel
 
@@ -87,6 +88,14 @@ defmodule ChatAgentWeb.ChannelLive do
     end
   end
 
+  # Answered on the tunnel topic rather than here: the check runs somewhere
+  # else, and every open page should see what it found, not only this one.
+  def handle_event("check_health", _params, socket) do
+    Tunnel.check_health()
+
+    {:noreply, socket}
+  end
+
   def handle_event("send_message", %{"send" => %{"channel" => name} = send}, socket) do
     # The channel comes from the form, the recipient from the conversation the
     # newest message arrived on: a bot cannot open a conversation on either
@@ -111,9 +120,12 @@ defmodule ChatAgentWeb.ChannelLive do
       <summary class="tunnel-summary">
         <span class="tunnel-chevron" aria-hidden="true"></span>
 
-        <span :if={@tunnel.state != :disabled} class={["tunnel-state", "is-#{@tunnel.state}"]}>
+        <span
+          :if={@tunnel.state != :disabled}
+          class={["tunnel-state", "is-#{@tunnel.state}", degraded?(@tunnel) && "is-degraded"]}
+        >
           <span class="conn-dot"></span>
-          {tunnel_state_label(@tunnel.state)}
+          {summary_label(@tunnel)}
         </span>
 
         <span :if={@tunnel.state == :disabled} class="tunnel-label">Callbacks</span>
@@ -140,6 +152,19 @@ defmodule ChatAgentWeb.ChannelLive do
         <p :if={@tunnel.state != :disabled} class="tunnel-provider">
           {provider_name(@tunnel.provider)}
           <span :if={@tunnel.since}>· since {Calendar.strftime(@tunnel.since, "%H:%M")}</span>
+          <span :if={checked_at(@tunnel)}>
+            · delivery checked {Calendar.strftime(checked_at(@tunnel), "%H:%M")}
+          </span>
+
+          <button
+            type="button"
+            class="tunnel-check"
+            phx-click="check_health"
+            disabled={@tunnel.state != :connected}
+            title="Ask every service whether it is managing to deliver, and repair what is not"
+          >
+            Check now
+          </button>
         </p>
 
         <p :if={@tunnel.error} class="tunnel-error">
@@ -168,9 +193,9 @@ defmodule ChatAgentWeb.ChannelLive do
 
             <span
               :if={@tunnel.state != :disabled}
-              class={["callback-state", registration_class(@tunnel.webhooks[channel])]}
+              class={["callback-state", callback_class(@tunnel, channel)]}
             >
-              {registration_label(@tunnel.webhooks[channel])}
+              {callback_label(@tunnel, channel)}
             </span>
           </li>
         </ul>
@@ -267,10 +292,92 @@ defmodule ChatAgentWeb.ChannelLive do
   end
 
   defp error_message(:registration_failed), do: "A channel could not be told where to call."
+
+  defp error_message(:delivery_failing) do
+    "A service still cannot deliver here, after being told again and given a new URL. " <>
+      "Whatever is in the way is not something this app can move."
+  end
+
   defp error_message(reason), do: "Last error: #{inspect(reason)}"
 
   defp provider_name(nil), do: "No agent"
   defp provider_name(provider), do: provider.name()
+
+  # The strip is collapsed by default, so whether anything is arriving has to
+  # be readable without opening it: a tunnel that is up and delivering nothing
+  # is the failure this panel used to report as "Connected".
+  defp degraded?(%Tunnel.Status{health: health}) do
+    Enum.any?(health, fn {_channel, result} -> match?({:ok, %Health{state: :failing}}, result) end)
+  end
+
+  defp summary_label(tunnel) do
+    if degraded?(tunnel), do: "Not delivering", else: tunnel_state_label(tunnel.state)
+  end
+
+  # When the checks last ran, which is what says the report below is current.
+  defp checked_at(%Tunnel.Status{health: health}) do
+    health
+    |> Enum.flat_map(fn
+      {_channel, {:ok, %Health{checked_at: %DateTime{} = at}}} -> [at]
+      {_channel, _result} -> []
+    end)
+    |> Enum.max(DateTime, fn -> nil end)
+  end
+
+  # Registration is what a service said when it was told where to call, health
+  # is what it says about calling since. The second answers the first, so it is
+  # shown wherever there is one.
+  defp callback_label(%Tunnel.Status{} = tunnel, channel) do
+    case tunnel.health[channel] do
+      nil -> registration_label(tunnel.webhooks[channel])
+      {:error, :not_supported} -> registration_label(tunnel.webhooks[channel])
+      {:error, _reason} -> "Could not be checked"
+      {:ok, health} -> health_label(health)
+    end
+  end
+
+  defp callback_class(%Tunnel.Status{} = tunnel, channel) do
+    case tunnel.health[channel] do
+      nil -> registration_class(tunnel.webhooks[channel])
+      {:error, :not_supported} -> registration_class(tunnel.webhooks[channel])
+      {:error, _reason} -> "is-muted"
+      {:ok, %Health{state: :failing}} -> "is-failing"
+      {:ok, _health} -> "is-ok"
+    end
+  end
+
+  defp health_label(%Health{state: :failing} = health) do
+    ["Not delivering", queued(health), last_error(health)]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join(" · ")
+  end
+
+  defp health_label(%Health{} = health) do
+    ["Delivering", queued(health)] |> Enum.reject(&is_nil/1) |> Enum.join(" · ")
+  end
+
+  # A queue of nothing is the normal case and not worth a word.
+  defp queued(%Health{pending: 0}), do: nil
+  defp queued(%Health{pending: 1}), do: "1 queued"
+  defp queued(%Health{pending: pending}), do: "#{pending} queued"
+
+  defp last_error(%Health{last_error: nil}), do: nil
+
+  defp last_error(%Health{last_error: message, last_error_at: at}) do
+    [message, ago(at)] |> Enum.reject(&is_nil/1) |> Enum.join(" ")
+  end
+
+  # Ages rather than clock times: what makes a failure worth acting on is that
+  # it happened just now, and a reader should not have to do the subtraction.
+  defp ago(nil), do: nil
+
+  defp ago(%DateTime{} = at) do
+    case max(DateTime.diff(DateTime.utc_now(), at), 0) do
+      seconds when seconds < 60 -> "#{seconds}s ago"
+      seconds when seconds < 3600 -> "#{div(seconds, 60)}m ago"
+      seconds -> "#{div(seconds, 3600)}h ago"
+    end
+  end
 
   # A channel is only reported on once the tunnel has had a URL to tell it
   # about, so nothing said yet is its own answer rather than a failure.

@@ -58,7 +58,7 @@ defmodule ChatAgent.AssistantTest do
 
   describe "authentication/1" do
     test "reads a password typed without quotes, which is what people type" do
-      assert {:ok, %{password: "hunter2", assistant: nil, work_dir: nil}} =
+      assert {:ok, %{password: "hunter2", assistant: nil, work_dir: nil, action: :open}} =
                Assistant.authentication("/auth hunter2")
 
       assert {:ok, %{password: "hunter2", assistant: "claude"}} =
@@ -84,6 +84,28 @@ defmodule ChatAgent.AssistantTest do
                Assistant.authentication(
                  ~s(/auth-claude "two words" --work-dir nested/my-app-folder)
                )
+    end
+
+    test "reads the two questions about the public URL, which open no session" do
+      assert {:ok, %{password: "hunter2", action: :url, work_dir: nil}} =
+               Assistant.authentication("/auth hunter2 --url")
+
+      assert {:ok, %{password: "hunter2", action: :renew, work_dir: nil}} =
+               Assistant.authentication("/auth hunter2 --renew")
+
+      assert {:ok, %{password: "two words", action: :url}} =
+               Assistant.authentication(~s(/auth "two words" --url))
+    end
+
+    test "refuses an option it does not know, rather than reading past it" do
+      # A word this does not understand is not an attempt at all, so it is met
+      # with the silence a wrong password gets rather than with a session.
+      assert :error = Assistant.authentication("/auth hunter2 --urls")
+      assert :error = Assistant.authentication("/auth hunter2 --renew-url")
+      assert :error = Assistant.authentication("/auth hunter2 --url --renew")
+      # The options are alternatives: what asks about the URL opens no session,
+      # so there is nothing for a working directory to belong to.
+      assert :error = Assistant.authentication("/auth hunter2 --url --work-dir my-app-folder")
     end
 
     test "ignores what a chat client adds around it" do
@@ -200,6 +222,16 @@ defmodule ChatAgent.AssistantTest do
         Message.new(sender: "123456", conversation: "123456", text: ~s(/auth-claude "hunter2"))
 
       assert %Message{text: ~s(/auth-claude "*****")} = Assistant.redact(message)
+    end
+
+    test "keeps the question a message asked, since only the password is secret" do
+      for option <- ["--url", "--renew"] do
+        message =
+          Message.new(sender: "123456", conversation: "123456", text: "/auth hunter2 #{option}")
+
+        assert %Message{text: text} = Assistant.redact(message)
+        assert text == "/auth ***** #{option}"
+      end
     end
 
     test "leaves a message carrying no password untouched" do

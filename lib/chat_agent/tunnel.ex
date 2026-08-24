@@ -36,12 +36,16 @@ defmodule ChatAgent.Tunnel do
         # How long to wait for the agent to report its URL before restarting it.
         connect_timeout: :timer.seconds(30),
         # Ceiling for the retry backoff between attempts.
-        max_backoff: :timer.minutes(1)
+        max_backoff: :timer.minutes(1),
+        # How often each channel is asked whether its service is managing to
+        # deliver to the URL it was given.
+        health_interval: :timer.minutes(1)
 
   ## Following the tunnel
 
-  Every state change is broadcast, so a page can show the current URL without
-  polling for it:
+  Every state change is broadcast, along with every delivery check that says
+  something new, so a page can show the current URL and whether anything is
+  arriving on it without polling for either:
 
       ChatAgent.Tunnel.subscribe()
       # => receives {:tunnel, %ChatAgent.Tunnel.Status{}}
@@ -99,6 +103,44 @@ defmodule ChatAgent.Tunnel do
     else
       %Status{state: :disabled, url: config()[:url]}
     end
+  end
+
+  @doc """
+  Open a new public URL, by running the tunnel agent again.
+
+  Answers `{:error, :not_configured}` where the URL is a static one, since
+  there is no agent to run and a deployment behind DNS is reachable at the same
+  place tomorrow. Answers `{:error, :down}` where an agent is configured but
+  its server is not running.
+
+  Returns as soon as the tunnel has been told to start over. The new URL
+  arrives on the topic (see `subscribe/0`) once the service has given one, and
+  `url/0` answers it from then on.
+  """
+  @spec renew() :: :ok | {:error, :not_configured | :down}
+  def renew do
+    if enabled?(), do: Server.renew(), else: {:error, :not_configured}
+  end
+
+  @doc """
+  Ask every channel how delivery to its webhook is going, and repair what is
+  broken.
+
+  A registration that was accepted can stop working without anything here
+  failing, so this is the question registration cannot answer: the service is
+  asked what it believes it is calling and how that has been going. What comes
+  back is carried on `ChatAgent.Tunnel.Status`, and a channel that reports
+  trouble is told again where to call, up to and including being given a new
+  URL (see `ChatAgent.Tunnel.Server`).
+
+  Runs on an interval on its own; this is that check asked for now. Answers
+  `{:error, :not_connected}` while there is no URL to check, and `{:error,
+  :not_configured}` where the URL is a static one, since a deployment behind
+  DNS is reachable at the same place tomorrow.
+  """
+  @spec check_health() :: :ok | {:error, :not_configured | :not_connected | :down}
+  def check_health do
+    if enabled?(), do: Server.check_health(), else: {:error, :not_configured}
   end
 
   @doc """

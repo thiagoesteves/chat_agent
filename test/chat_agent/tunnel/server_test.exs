@@ -5,6 +5,7 @@ defmodule ChatAgent.Tunnel.ServerTest do
   import Mox
 
   alias ChatAgent.Channel
+  alias ChatAgent.Channel.Health
   alias ChatAgent.CommanderMock
   alias ChatAgent.Tunnel
   alias ChatAgent.Tunnel.Server
@@ -35,6 +36,7 @@ defmodule ChatAgent.Tunnel.ServerTest do
     stub(TunnelProviderMock, :command, fn port -> "test_agent http #{port}" end)
     stub(TunnelProviderMock, :parse, &parse/1)
     stub(CommanderMock, :stop, fn _os_pid -> :ok end)
+    stub(ChatAgent.ChannelMock, :webhook_health, fn -> {:error, :not_supported} end)
 
     Tunnel.subscribe()
     on_exit(&Tunnel.unsubscribe/0)
@@ -56,7 +58,7 @@ defmodule ChatAgent.Tunnel.ServerTest do
         :ok
       end)
 
-      expect(ChatAgent.ChannelMock, :register_webhook, fn url ->
+      expect(ChatAgent.ChannelMock, :register_webhook, fn url, _options ->
         send(test_process, {:register_webhook, url})
         {:ok, :registered}
       end)
@@ -85,7 +87,8 @@ defmodule ChatAgent.Tunnel.ServerTest do
 
     test "waits for a whole line before reading it, since output arrives in chunks" do
       expect(CommanderMock, :run_link, fn _command, _options -> start_agent() end)
-      expect(ChatAgent.ChannelMock, :register_webhook, fn _url -> {:ok, :registered} end)
+
+      expect(ChatAgent.ChannelMock, :register_webhook, fn _url, _options -> {:ok, :registered} end)
 
       server = start_server()
       assert_receive {:tunnel, %Status{state: :connecting}}
@@ -103,7 +106,8 @@ defmodule ChatAgent.Tunnel.ServerTest do
 
     test "reads a line the agent reports a failure on, and keeps it in the status" do
       expect(CommanderMock, :run_link, fn _command, _options -> start_agent() end)
-      expect(ChatAgent.ChannelMock, :register_webhook, fn _url -> {:ok, :registered} end)
+
+      expect(ChatAgent.ChannelMock, :register_webhook, fn _url, _options -> {:ok, :registered} end)
 
       server = start_server()
       assert_receive {:tunnel, %Status{state: :connecting}}
@@ -149,7 +153,7 @@ defmodule ChatAgent.Tunnel.ServerTest do
         start_agent()
       end)
 
-      expect(ChatAgent.ChannelMock, :register_webhook, fn _url -> {:ok, :registered} end)
+      expect(ChatAgent.ChannelMock, :register_webhook, fn _url, _options -> {:ok, :registered} end)
 
       server = start_server()
 
@@ -192,9 +196,9 @@ defmodule ChatAgent.Tunnel.ServerTest do
 
       expect(CommanderMock, :run_link, fn _command, _options -> start_agent() end)
 
-      expect(ChatAgent.ChannelMock, :register_webhook, fn _url -> {:error, :timeout} end)
+      expect(ChatAgent.ChannelMock, :register_webhook, fn _url, _options -> {:error, :timeout} end)
 
-      expect(ChatAgent.ChannelMock, :register_webhook, fn _url ->
+      expect(ChatAgent.ChannelMock, :register_webhook, fn _url, _options ->
         send(test_process, :registered)
         {:ok, :registered}
       end)
@@ -210,7 +214,10 @@ defmodule ChatAgent.Tunnel.ServerTest do
 
     test "asks a channel that cannot register only once" do
       expect(CommanderMock, :run_link, fn _command, _options -> start_agent() end)
-      expect(ChatAgent.ChannelMock, :register_webhook, 1, fn _url -> {:error, :not_supported} end)
+
+      expect(ChatAgent.ChannelMock, :register_webhook, 1, fn _url, _options ->
+        {:error, :not_supported}
+      end)
 
       server = start_server()
       assert_receive {:tunnel, %Status{state: :connecting}}
@@ -226,7 +233,7 @@ defmodule ChatAgent.Tunnel.ServerTest do
 
       expect(CommanderMock, :run_link, fn _command, _options -> start_agent() end)
 
-      expect(ChatAgent.ChannelMock, :register_webhook, 2, fn url ->
+      expect(ChatAgent.ChannelMock, :register_webhook, 2, fn url, _options ->
         send(test_process, {:register_webhook, url})
         {:ok, :registered}
       end)
@@ -333,7 +340,8 @@ defmodule ChatAgent.Tunnel.ServerTest do
       on_exit(fn -> Logger.configure(level: :warning) end)
 
       expect(CommanderMock, :run_link, fn _command, _options -> start_agent() end)
-      expect(ChatAgent.ChannelMock, :register_webhook, fn _url -> {:ok, :registered} end)
+
+      expect(ChatAgent.ChannelMock, :register_webhook, fn _url, _options -> {:ok, :registered} end)
 
       log =
         capture_log(fn ->
@@ -366,9 +374,308 @@ defmodule ChatAgent.Tunnel.ServerTest do
     end
   end
 
+  describe "renew/1" do
+    test "stops the agent and opens another tunnel, which is another URL" do
+      test_process = self()
+
+      expect(CommanderMock, :run_link, 2, fn _command, _options -> start_agent() end)
+
+      expect(CommanderMock, :stop, fn os_pid ->
+        send(test_process, {:stopped, os_pid})
+        :ok
+      end)
+
+      expect(ChatAgent.ChannelMock, :register_webhook, 2, fn url, _options ->
+        send(test_process, {:register_webhook, url})
+        {:ok, :registered}
+      end)
+
+      server = start_server()
+      agent_says(server, url_line(@url))
+      assert_receive {:tunnel, %Status{state: :connected, url: @url}}
+      assert_receive {:register_webhook, _url}
+
+      assert :ok = Server.renew(server)
+
+      # The agent it had is stopped, and the URL it had goes with it: what the
+      # service handed out is gone before another is asked for.
+      assert_receive {:stopped, @os_pid}
+      assert_receive {:tunnel, %Status{state: :authenticating, url: nil}}
+
+      renewed = "https://d4e5f6.ngrok-free.app"
+      webhook = "#{renewed}/mock/webhook"
+      agent_says(server, url_line(renewed))
+
+      assert_receive {:register_webhook, ^webhook}
+      assert_receive {:tunnel, %Status{state: :connected, url: ^renewed}}
+    end
+
+    test "runs the next attempt straight away, rather than after the backoff" do
+      # A tunnel that has been failing has a backoff built up. Somebody asking
+      # for a new URL is not that retry, and should not wait through it.
+      expect(TunnelProviderMock, :authenticate, fn -> {:error, :no_credentials} end)
+
+      server = start_server(max_backoff: 30_000)
+
+      assert_receive {:tunnel, %Status{state: :authenticating, error: nil}}
+      # The next attempt of its own is now seconds away.
+      assert_receive {:tunnel, %Status{state: :authenticating, error: :no_credentials}}
+
+      expect(CommanderMock, :run_link, fn _command, _options -> start_agent() end)
+      stub(TunnelProviderMock, :authenticate, fn -> :ok end)
+
+      assert :ok = Server.renew(server)
+
+      # Without the reset this waits out a backoff measured in seconds.
+      assert_receive {:tunnel, %Status{state: :authenticating, error: nil}}, 500
+      assert_receive {:tunnel, %Status{state: :connecting}}, 500
+    end
+
+    test "is answerable before there is an agent to stop" do
+      expect(TunnelProviderMock, :authenticate, fn -> {:error, :no_credentials} end)
+      stub(CommanderMock, :stop, fn _os_pid -> flunk("stopped an agent that never ran") end)
+
+      server = start_server(max_backoff: 30_000)
+
+      assert_receive {:tunnel, %Status{state: :authenticating, error: :no_credentials}}
+
+      stub(TunnelProviderMock, :authenticate, fn -> :ok end)
+      expect(CommanderMock, :run_link, fn _command, _options -> start_agent() end)
+
+      assert :ok = Server.renew(server)
+
+      assert_receive {:tunnel, %Status{state: :connecting}}, 500
+    end
+
+    test "reports a server that is not running, rather than raising" do
+      assert {:error, :down} = Server.renew(:no_such_tunnel)
+    end
+  end
+
+  describe "delivery health" do
+    test "asks every channel how delivery is going, and carries the answer" do
+      server = connected_server()
+
+      expect(ChatAgent.ChannelMock, :webhook_health, fn -> {:ok, delivering()} end)
+
+      assert_receive {:tunnel, %Status{state: :connected, health: health}}, 500
+      assert %{mock: {:ok, %Health{state: :ok, pending: 0}}} = health
+      # Still connected: this is a report, not a transition.
+      assert %Status{state: :connected} = Server.status(server)
+    end
+
+    test "tells a service that is not delivering where to call, again" do
+      test_process = self()
+
+      connected_server()
+
+      stub(ChatAgent.ChannelMock, :webhook_health, fn -> {:ok, failing()} end)
+
+      expect(ChatAgent.ChannelMock, :register_webhook, fn url, options ->
+        send(test_process, {:registered_again, url, options})
+        {:ok, :registered}
+      end)
+
+      # The registration already points here, which is exactly why it has to be
+      # written rather than read: only the write makes the service look the
+      # address up again.
+      assert_receive {:registered_again, "#{@url}/mock/webhook", force: true}, 500
+    end
+
+    test "gives up the URL itself once telling the service again has not helped" do
+      test_process = self()
+
+      server = connected_server()
+
+      stub(ChatAgent.ChannelMock, :webhook_health, fn -> {:ok, failing()} end)
+      stub(CommanderMock, :stop, fn os_pid -> send(test_process, {:stopped, os_pid}) && :ok end)
+
+      # Two forced registrations, and then the URL is the only thing left to
+      # suspect.
+      assert_receive {:stopped, @os_pid}, 1_000
+      assert_receive {:tunnel, %Status{state: :authenticating, url: nil}}, 1_000
+
+      assert %Status{url: nil} = Server.status(server)
+    end
+
+    test "logs what each check found, where a log is being read" do
+      Logger.configure(level: :info)
+      on_exit(fn -> Logger.configure(level: :warning) end)
+
+      log =
+        capture_log(fn ->
+          connected_server()
+
+          stub(ChatAgent.ChannelMock, :webhook_health, fn -> {:ok, delivering()} end)
+
+          assert_receive {:tunnel, %Status{health: %{mock: {:ok, _health}}}}, 500
+        end)
+
+      assert log =~ "channel_delivery_checked"
+      assert log =~ "state: :ok"
+    end
+
+    test "stops saying delivery is failing once it is not" do
+      server = connected_server()
+
+      stub(ChatAgent.ChannelMock, :webhook_health, fn -> {:ok, failing()} end)
+
+      # All the way down the ladder, to the state that reports and waits.
+      assert_receive {:tunnel, %Status{state: :connecting}}, 1_000
+      agent_says(server, url_line(@url))
+      assert_receive {:tunnel, %Status{error: :delivery_failing}}, 1_000
+
+      # Whatever was in the way has been moved, somewhere this app cannot see.
+      stub(ChatAgent.ChannelMock, :webhook_health, fn -> {:ok, delivering()} end)
+
+      assert_receive {:tunnel, %Status{error: nil, health: %{mock: {:ok, %Health{state: :ok}}}}},
+                     1_000
+    end
+
+    test "stops repairing, and says why, once a new URL did not help either" do
+      test_process = self()
+
+      server = connected_server()
+
+      stub(ChatAgent.ChannelMock, :webhook_health, fn -> {:ok, failing()} end)
+      stub(CommanderMock, :stop, fn os_pid -> send(test_process, {:stopped, os_pid}) && :ok end)
+
+      # Through the ladder: told again, told again, given another URL, and told
+      # again on that one too.
+      assert_receive {:tunnel, %Status{state: :connecting}}, 1_000
+      agent_says(server, url_line(@url))
+
+      assert_receive {:tunnel, %Status{error: :delivery_failing}}, 1_000
+
+      # The checks carry on, so a failure that ends elsewhere is still noticed,
+      # but nothing more is thrown away over it: no further agent is stopped,
+      # which is what renewing one would start with.
+      flush()
+      refute_receive {:stopped, _os_pid}, 200
+    end
+
+    test "does not repair on a check that could not be made" do
+      connected_server()
+
+      stub(ChatAgent.ChannelMock, :webhook_health, fn -> {:error, :timeout} end)
+
+      stub(ChatAgent.ChannelMock, :register_webhook, fn _url, _options ->
+        flunk("re-registered because a service could not be reached to be asked")
+      end)
+
+      assert_receive {:tunnel, %Status{health: %{mock: {:error, :timeout}}}}, 500
+
+      flush()
+      refute_receive {:tunnel, %Status{state: :registering}}, 200
+    end
+
+    test "treats a service that points somewhere else as one that cannot deliver" do
+      test_process = self()
+
+      connected_server()
+
+      stub(ChatAgent.ChannelMock, :webhook_health, fn ->
+        {:ok,
+         %Health{delivering() | url: "https://somebody-elses-tunnel.example.com/mock/webhook"}}
+      end)
+
+      expect(ChatAgent.ChannelMock, :register_webhook, fn url, options ->
+        send(test_process, {:registered_again, url, options})
+        {:ok, :registered}
+      end)
+
+      assert_receive {:registered_again, "#{@url}/mock/webhook", force: true}, 500
+    end
+
+    test "asks a channel that cannot answer only once" do
+      test_process = self()
+
+      connected_server()
+
+      stub(ChatAgent.ChannelMock, :webhook_health, fn ->
+        send(test_process, :asked)
+        {:error, :not_supported}
+      end)
+
+      assert_receive :asked, 500
+      # Several intervals later, and it has not been asked again: retrying
+      # cannot change that answer.
+      refute_receive :asked, 200
+    end
+  end
+
+  describe "check_health/1" do
+    test "asks now, rather than at the next interval" do
+      test_process = self()
+
+      # Long enough that nothing here could be the interval coming round.
+      connected_server(health_interval: 60_000)
+
+      stub(ChatAgent.ChannelMock, :webhook_health, fn ->
+        send(test_process, :asked)
+        {:ok, delivering()}
+      end)
+
+      refute_receive :asked, 100
+
+      assert :ok = Server.check_health()
+
+      assert_receive :asked, 500
+      assert_receive {:tunnel, %Status{health: %{mock: {:ok, %Health{state: :ok}}}}}, 500
+    end
+
+    test "reports a tunnel with no URL open, which has nothing to check yet" do
+      expect(TunnelProviderMock, :authenticate, fn -> {:error, :no_credentials} end)
+
+      server = start_server(max_backoff: 30_000)
+
+      assert_receive {:tunnel, %Status{state: :authenticating, error: :no_credentials}}
+
+      assert {:error, :not_connected} = Server.check_health(server)
+    end
+
+    test "reports a server that is not running, rather than raising" do
+      assert {:error, :down} = Server.check_health(:no_such_tunnel)
+    end
+  end
+
   ### ==========================================================================
   ### Helpers
   ### ==========================================================================
+
+  # A tunnel that has reached `:connected`, which is the only state that has
+  # delivery to answer for.
+  defp connected_server(options \\ []) do
+    stub(CommanderMock, :run_link, fn _command, _options -> start_agent() end)
+    stub(ChatAgent.ChannelMock, :register_webhook, fn _url, _options -> {:ok, :registered} end)
+
+    server = start_server(Keyword.put_new(options, :health_interval, 30))
+
+    assert_receive {:tunnel, %Status{state: :connecting}}
+    agent_says(server, url_line(@url))
+    assert_receive {:tunnel, %Status{state: :connected}}
+
+    server
+  end
+
+  defp delivering do
+    %Health{
+      state: :ok,
+      url: "#{@url}/mock/webhook",
+      pending: 0,
+      checked_at: DateTime.utc_now()
+    }
+  end
+
+  defp failing do
+    %Health{
+      delivering()
+      | state: :failing,
+        pending: 3,
+        last_error: "Connection timed out",
+        last_error_at: DateTime.utc_now()
+    }
+  end
 
   defp start_server(options \\ []) do
     options =
@@ -389,6 +696,16 @@ defmodule ChatAgent.Tunnel.ServerTest do
   end
 
   defp agent_says(server, output), do: send(server, {:stdout, @os_pid, output})
+
+  # What a state machine did on the way here is already in the mailbox, and a
+  # `refute_receive` about what it does next would find it there.
+  defp flush do
+    receive do
+      _message -> flush()
+    after
+      0 -> :ok
+    end
+  end
 
   defp kill_agent(server) do
     %{exec_pid: pid} = :sys.get_state(server) |> elem(1)
