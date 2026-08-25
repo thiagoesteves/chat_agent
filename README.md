@@ -133,6 +133,28 @@ The app repairs what it can on its own, telling the service again where to call 
 | ngrok | install the agent, then `ngrok config add-authtoken …` or set `authtoken` | A free URL changes on every restart |
 | Pinggy | nothing to install beyond `ssh` | A free tunnel expires after an hour, and the app opens another; a token keeps one URL |
 
+### What guards that URL
+
+A public URL is reachable by whoever finds it, and the services that call it do not agree on how they prove who they are: Telegram sends back a header, Meta signs the body, and a third might do neither.
+What all of them do is call the URL they were given, so that is where the secret goes:
+
+```
+https://4c5b-….ngrok-free.app/telegram/webhook?token=Ck1s…
+```
+
+A request without it is refused with 403 before its body is read.
+The token is generated per channel at startup and registered along with the URL, so a development machine needs no configuration for this and gets no open webhook either.
+It is a query parameter rather than part of the path so that it stays out of the request log, which records the path and stops at the `?`.
+
+Behind a fixed name rather than a tunnel, nothing re-registers the URL after a restart, so set the token instead of letting it be generated:
+
+```bash
+TELEGRAM_WEBHOOK_TOKEN=…
+WHATSAPP_WEBHOOK_TOKEN=…
+```
+
+Leaving them unset there logs a warning at startup and refuses deliveries until the webhook is registered again.
+
 Either way, `TUNNEL_PROVIDER=ngrok mix phx.server` works as well as configuring the provider in the override file.
 
 ## Files sent to the bot
@@ -235,6 +257,8 @@ PHX_HOST=chat.example.com          # the public URL, instead of a tunnel
 SECRET_KEY_BASE=…                  # mix phx.gen.secret
 DATABASE_PATH=/data/chat_agent.db  # a mounted volume
 ASSISTANT_SALTED_PASSWORD=…        # a hash, not a password; without one nothing is answered
+TELEGRAM_WEBHOOK_TOKEN=…           # guards the webhook URL; generated per boot if unset,
+WHATSAPP_WEBHOOK_TOKEN=…           # which behind a fixed name means deliveries stop
 ```
 
 A release cannot run Mix, so migrations run through the release itself:

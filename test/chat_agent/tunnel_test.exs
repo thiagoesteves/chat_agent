@@ -56,7 +56,8 @@ defmodule ChatAgent.TunnelTest do
     test "builds a channel's webhook URL from the public one" do
       configure(url: "https://chat.example.com")
 
-      assert {:ok, "https://chat.example.com/telegram/webhook"} = Tunnel.webhook_url(:telegram)
+      assert {:ok, "https://chat.example.com/telegram/webhook?token=test_telegram_webhook_token"} =
+               Tunnel.webhook_url(:telegram)
     end
 
     test "passes on the reason there is no URL" do

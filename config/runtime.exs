@@ -42,6 +42,19 @@ if telegram_webhook_secret = System.get_env("TELEGRAM_WEBHOOK_SECRET") do
   config :chat_agent, ChatAgent.Channel.Telegram, webhook_secret: telegram_webhook_secret
 end
 
+# The secret each channel's webhook URL carries. Unset generates one per node
+# at startup, which is right behind a tunnel that hands out a new URL anyway
+# and wrong behind a fixed name, where nothing re-registers it. See
+# `ChatAgent.Channel.Token`.
+for {variable, channel} <- [
+      {"TELEGRAM_WEBHOOK_TOKEN", :telegram},
+      {"WHATSAPP_WEBHOOK_TOKEN", :whatsapp}
+    ] do
+  if webhook_token = System.get_env(variable) do
+    config :chat_agent, ChatAgent.Channel.Token, [{channel, webhook_token}]
+  end
+end
+
 if telegram_download_dir = System.get_env("TELEGRAM_DOWNLOAD_DIR") do
   config :chat_agent, ChatAgent.Channel.Telegram, download_dir: telegram_download_dir
 end

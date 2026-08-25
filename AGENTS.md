@@ -69,9 +69,13 @@ Webhook URLs follow one shape, `/<channel>/webhook`, with a router scope per cha
 |---|---|---|
 | `/whatsapp/webhook` | GET | WhatsApp subscription handshake (`hub.challenge`) |
 | `/whatsapp/webhook` | POST | WhatsApp inbound messages |
-| `/telegram/webhook` | POST | Telegram inbound updates, guarded by a secret header |
+| `/telegram/webhook` | POST | Telegram inbound updates, additionally guarded by a secret header |
 | `/channels` | GET | LiveView dashboard of every configured channel |
 | `/health` | GET | Liveness probe, `{"status": "ok", "timestamp": ...}` |
+
+Every webhook route, of every channel and every verb, is behind
+`ChatAgentWeb.Plugs.WebhookToken`, in a pipeline of its own per channel.
+See "The webhook token" below.
 
 There is one controller per channel, and one router scope per channel.
 The channel is fixed by the route rather than read out of the body, which matters for more
@@ -101,7 +105,42 @@ A key belongs to exactly one channel, so nothing has to be prefixed to stay apar
 Defaults live in `config/config.exs`, secrets are read from the environment in `config/runtime.exs`, and each key there is set only when its variable is present, so a local `config/<env>.override.exs` is never overwritten with a nil.
 
 Runtime configuration comes from environment variables read in `config/runtime.exs`:
-`ASSISTANT_SALTED_PASSWORD`, `TELEGRAM_ALLOWED_CHAT_IDS`, `WHATSAPP_ALLOWED_CHAT_IDS`, `ASSISTANT_WORKING_DIR_ROOT`, `ASSISTANT_WORKING_DIR`, `CLAUDE_EXECUTABLE`, `CLAUDE_ALLOWED_TOOLS`, `PINGGY_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_DOWNLOAD_DIR`, `HEALTHCHECK_LOGGING`, `TUNNEL_PROVIDER`, `PUBLIC_URL`, `NGROK_AUTHTOKEN`, `NGROK_DOMAIN`.
+`ASSISTANT_SALTED_PASSWORD`, `TELEGRAM_ALLOWED_CHAT_IDS`, `WHATSAPP_ALLOWED_CHAT_IDS`, `ASSISTANT_WORKING_DIR_ROOT`, `ASSISTANT_WORKING_DIR`, `CLAUDE_EXECUTABLE`, `CLAUDE_ALLOWED_TOOLS`, `PINGGY_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_WEBHOOK_TOKEN`, `WHATSAPP_WEBHOOK_TOKEN`, `TELEGRAM_DOWNLOAD_DIR`, `HEALTHCHECK_LOGGING`, `TUNNEL_PROVIDER`, `PUBLIC_URL`, `NGROK_AUTHTOKEN`, `NGROK_DOMAIN`.
+
+### The webhook token
+
+A webhook is on the public internet, so the URL is the whole of its authentication unless something else is added.
+Services do not agree on what that something else is: Telegram sends back a header it was given, Meta signs the body, and a third may do neither.
+What all of them do is call the URL they were handed, exactly as handed, which makes the URL the one place a secret can be put that works for every channel.
+
+`ChatAgent.Channel.Token` holds that secret, one per channel, and `ChatAgent.Channel.webhook_url/2` is the single place it is added:
+
+```
+https://a1b2c3.ngrok-free.app/telegram/webhook?token=Ck1s...
+```
+
+Since `webhook_url/2` is what registration is built from *and* what `ChatAgent.Tunnel.Server` compares a health report against, a token that changes cannot leave those two disagreeing.
+
+It rides as a query parameter rather than a path segment deliberately.
+`Plug.Telemetry` and Phoenix's logger write `conn.request_path`, which stops at the `?`, so the token stays out of every request log line; a secret path segment would be written to the log on each delivery.
+`config :phoenix, :filter_parameters` covers the places a parameter is written down instead.
+`ChatAgentWeb.Plugs.WebhookToken` also deletes the token from `conn.params` on the way through, so a secret is never handed to a channel as though the service had sent it.
+
+Tokens are configured per channel, keyed by channel rather than kept under a channel module, because a token is not something the service knows about and it guards a route rather than an adapter:
+
+```elixir
+config :chat_agent, ChatAgent.Channel.Token,
+  telegram: "...",
+  whatsapp: "..."
+```
+
+Unset, a token is generated per channel when the application starts.
+That is right on a development machine, where `ChatAgent.Tunnel` opens a new public URL every time and re-registers each channel against it anyway.
+It is wrong behind a static `PUBLIC_URL`, where nothing re-registers and the service goes on calling the URL it was last given, so that case logs `webhook_token_generated` at `:warning` at startup.
+Set `TELEGRAM_WEBHOOK_TOKEN` and `WHATSAPP_WEBHOOK_TOKEN` there.
+
+This guard replaces nothing a channel can do for itself.
+Telegram still checks `x-telegram-bot-api-secret-token` in `ChatAgent.Channel.Telegram.authenticate/1` on top of it.
 
 ### The public URL
 

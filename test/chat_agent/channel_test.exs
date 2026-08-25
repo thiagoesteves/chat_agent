@@ -8,6 +8,7 @@ defmodule ChatAgent.ChannelTest do
 
   alias ChatAgent.Channel
   alias ChatAgent.Channel.Message
+  alias ChatAgent.Channel.Token
 
   setup :verify_on_exit!
 
@@ -107,7 +108,9 @@ defmodule ChatAgent.ChannelTest do
       stub_channel()
 
       expect(ChatAgent.ChannelMock, :register_webhook, fn url, _options ->
-        assert url == "https://a1b2c3.ngrok-free.app/mock/webhook"
+        assert url ==
+                 "https://a1b2c3.ngrok-free.app/mock/webhook?token=test_mock_webhook_token"
+
         {:ok, :registered}
       end)
 
@@ -178,12 +181,24 @@ defmodule ChatAgent.ChannelTest do
   describe "webhook_url/2" do
     test "follows the route shape every channel webhook is served on" do
       assert Channel.webhook_url(:telegram, "https://example.com") ==
-               "https://example.com/telegram/webhook"
+               "https://example.com/telegram/webhook?token=test_telegram_webhook_token"
     end
 
     test "does not double the separator when the base URL ends in one" do
       assert Channel.webhook_url(:whatsapp, "https://example.com/") ==
-               "https://example.com/whatsapp/webhook"
+               "https://example.com/whatsapp/webhook?token=test_whatsapp_webhook_token"
+    end
+
+    test "carries the token the channel's own webhook is guarded by" do
+      for channel <- [:telegram, :whatsapp] do
+        %URI{query: query} = URI.parse(Channel.webhook_url(channel, "https://example.com"))
+
+        assert URI.decode_query(query) == %{"token" => Token.for(channel)}
+      end
+    end
+
+    test "gives each channel a token of its own, so one URL does not open another" do
+      refute Token.for(:telegram) == Token.for(:whatsapp)
     end
   end
 
