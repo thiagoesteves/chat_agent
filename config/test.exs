@@ -53,3 +53,10 @@ config :chat_agent, ChatAgent.Repo,
   database: "priv/repo/test.sqlite3",
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: 1
+
+# Fixed webhook tokens, so a URL built in a test is the same on every run.
+# `mock` is the channel most tests register their `ChatAgent.ChannelMock` under.
+config :chat_agent, ChatAgent.Channel.Token,
+  telegram: "test_telegram_webhook_token",
+  whatsapp: "test_whatsapp_webhook_token",
+  mock: "test_mock_webhook_token"

@@ -9,10 +9,13 @@ defmodule ChatAgentWeb.WhatsappControllerTest do
 
   setup :verify_on_exit!
 
+  @token "test_whatsapp_webhook_token"
+
   describe "GET /whatsapp/webhook" do
     test "answers the subscription handshake", %{conn: conn} do
       conn =
         get(conn, ~p"/whatsapp/webhook", %{
+          "token" => @token,
           "hub.mode" => "subscribe",
           "hub.verify_token" => "test_verify_token",
           "hub.challenge" => "challenge_123"
@@ -25,6 +28,7 @@ defmodule ChatAgentWeb.WhatsappControllerTest do
     test "rejects a handshake with the wrong token", %{conn: conn} do
       conn =
         get(conn, ~p"/whatsapp/webhook", %{
+          "token" => @token,
           "hub.mode" => "subscribe",
           "hub.verify_token" => "wrong",
           "hub.challenge" => "challenge_123"
@@ -35,7 +39,7 @@ defmodule ChatAgentWeb.WhatsappControllerTest do
     end
 
     test "rejects a request that is not a handshake", %{conn: conn} do
-      conn = get(conn, ~p"/whatsapp/webhook", %{"hub.mode" => "unsubscribe"})
+      conn = get(conn, ~p"/whatsapp/webhook", %{"token" => @token, "hub.mode" => "unsubscribe"})
 
       assert conn.status == 400
       assert conn.resp_body == "Bad Request"
@@ -99,7 +103,7 @@ defmodule ChatAgentWeb.WhatsappControllerTest do
   defp post_webhook(conn, payload) do
     conn
     |> put_req_header("content-type", "application/json")
-    |> post(~p"/whatsapp/webhook", Jason.encode!(payload))
+    |> post("/whatsapp/webhook?token=#{@token}", Jason.encode!(payload))
   end
 
   defp message(id, body) do

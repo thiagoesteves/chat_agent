@@ -52,6 +52,7 @@ defmodule ChatAgent.Channel do
   alias ChatAgent.Channel.Adapter
   alias ChatAgent.Channel.Health
   alias ChatAgent.Channel.Message
+  alias ChatAgent.Channel.Token
 
   require Logger
 
@@ -207,14 +208,22 @@ defmodule ChatAgent.Channel do
   Webhook routes all follow the one shape declared in `ChatAgentWeb.Router`,
   which is what lets this be built rather than configured per channel.
 
+  The URL carries the channel's `ChatAgent.Channel.Token`, and that token is
+  what `ChatAgentWeb.Plugs.WebhookToken` requires back on every delivery. This
+  is the one place it is added, so a service is registered with the same URL
+  that is then checked against, and a token that changes cannot leave the two
+  disagreeing.
+
   ## Examples
 
       iex> ChatAgent.Channel.webhook_url(:telegram, "https://example.com/")
-      "https://example.com/telegram/webhook"
+      "https://example.com/telegram/webhook?token=test_telegram_webhook_token"
   """
   @spec webhook_url(channel :: channel(), base_url :: String.t()) :: String.t()
   def webhook_url(channel, base_url) do
-    "#{String.trim_trailing(base_url, "/")}/#{channel}/webhook"
+    query = URI.encode_query(%{"token" => Token.for_channel(channel)})
+
+    "#{String.trim_trailing(base_url, "/")}/#{channel}/webhook?#{query}"
   end
 
   @doc """

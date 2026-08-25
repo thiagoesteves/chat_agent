@@ -76,7 +76,7 @@ defmodule ChatAgent.Tunnel.ServerTest do
 
       agent_says(server, url_line(@url))
 
-      assert_receive {:register_webhook, "#{@url}/mock/webhook"}
+      assert_receive {:register_webhook, "#{@url}/mock/webhook?token=test_mock_webhook_token"}
       assert_receive {:tunnel, %Status{state: :connected, url: @url}}
 
       assert {:ok, @url} = Server.url(server)
@@ -252,7 +252,9 @@ defmodule ChatAgent.Tunnel.ServerTest do
 
       agent_says(server, url_line("https://d4e5f6.ngrok-free.app"))
 
-      assert_receive {:register_webhook, "https://d4e5f6.ngrok-free.app/mock/webhook"}
+      assert_receive {:register_webhook,
+                      "https://d4e5f6.ngrok-free.app/mock/webhook?token=test_mock_webhook_token"}
+
       assert_receive {:tunnel, %Status{state: :connected, url: "https://d4e5f6.ngrok-free.app"}}
     end
   end
@@ -403,7 +405,7 @@ defmodule ChatAgent.Tunnel.ServerTest do
       assert_receive {:tunnel, %Status{state: :authenticating, url: nil}}
 
       renewed = "https://d4e5f6.ngrok-free.app"
-      webhook = "#{renewed}/mock/webhook"
+      webhook = "#{renewed}/mock/webhook?token=test_mock_webhook_token"
       agent_says(server, url_line(renewed))
 
       assert_receive {:register_webhook, ^webhook}
@@ -479,7 +481,9 @@ defmodule ChatAgent.Tunnel.ServerTest do
       # The registration already points here, which is exactly why it has to be
       # written rather than read: only the write makes the service look the
       # address up again.
-      assert_receive {:registered_again, "#{@url}/mock/webhook", force: true}, 500
+      assert_receive {:registered_again, "#{@url}/mock/webhook?token=test_mock_webhook_token",
+                      force: true},
+                     500
     end
 
     test "gives up the URL itself once telling the service again has not helped" do
@@ -576,7 +580,11 @@ defmodule ChatAgent.Tunnel.ServerTest do
 
       stub(ChatAgent.ChannelMock, :webhook_health, fn ->
         {:ok,
-         %Health{delivering() | url: "https://somebody-elses-tunnel.example.com/mock/webhook"}}
+         %Health{
+           delivering()
+           | url:
+               "https://somebody-elses-tunnel.example.com/mock/webhook?token=test_mock_webhook_token"
+         }}
       end)
 
       expect(ChatAgent.ChannelMock, :register_webhook, fn url, options ->
@@ -584,7 +592,9 @@ defmodule ChatAgent.Tunnel.ServerTest do
         {:ok, :registered}
       end)
 
-      assert_receive {:registered_again, "#{@url}/mock/webhook", force: true}, 500
+      assert_receive {:registered_again, "#{@url}/mock/webhook?token=test_mock_webhook_token",
+                      force: true},
+                     500
     end
 
     test "asks a channel that cannot answer only once" do
@@ -661,7 +671,7 @@ defmodule ChatAgent.Tunnel.ServerTest do
   defp delivering do
     %Health{
       state: :ok,
-      url: "#{@url}/mock/webhook",
+      url: "#{@url}/mock/webhook?token=test_mock_webhook_token",
       pending: 0,
       checked_at: DateTime.utc_now()
     }

@@ -44,14 +44,41 @@ defmodule ChatAgentWeb.TelegramControllerTest do
   end
 
   test "POST /telegram/webhook has no handshake route", %{conn: conn} do
-    assert get(conn, "/telegram/webhook", %{}).status == 404
+    assert get(conn, "/telegram/webhook?token=test_telegram_webhook_token", %{}).status == 404
   end
 
-  defp post_webhook(conn, payload, secret) do
+  test "POST /telegram/webhook rejects a wrong URL token before the secret is checked",
+       %{conn: conn} do
+    stub_channel()
+
+    # No expectation: the update must never reach the channel. The header
+    # secret is the right one, so it is the token in the URL being refused.
+    update = %{"update_id" => 1, "message" => %{"chat" => %{"id" => 123_456}, "text" => "Hello"}}
+
+    conn = post_webhook(conn, update, "test_telegram_webhook_secret", "wrong")
+
+    assert conn.status == 403
+    assert conn.resp_body == "Forbidden"
+  end
+
+  test "POST /telegram/webhook rejects a request carrying no token at all", %{conn: conn} do
+    stub_channel()
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("x-telegram-bot-api-secret-token", "test_telegram_webhook_secret")
+      |> post("/telegram/webhook", Jason.encode!(%{"update_id" => 1}))
+
+    assert conn.status == 403
+    assert conn.resp_body == "Forbidden"
+  end
+
+  defp post_webhook(conn, payload, secret, token \\ "test_telegram_webhook_token") do
     conn
     |> put_req_header("content-type", "application/json")
     |> put_req_header("x-telegram-bot-api-secret-token", secret)
-    |> post(~p"/telegram/webhook", Jason.encode!(payload))
+    |> post("/telegram/webhook?token=#{token}", Jason.encode!(payload))
   end
 
   defp stub_channel do

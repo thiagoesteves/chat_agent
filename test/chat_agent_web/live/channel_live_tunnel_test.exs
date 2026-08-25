@@ -355,7 +355,12 @@ defmodule ChatAgentWeb.ChannelLiveTunnelTest do
       html = render(view)
 
       assert html =~ ~s(phx-hook="CopyToClipboard")
-      assert html =~ ~s(data-copy="https://a1b2c3.ngrok-free.app/telegram/webhook")
+      # The whole URL, token and all. The dashboard is behind a login and the
+      # point of the button is pasting this into the service that has to call
+      # it, so a redacted URL would be one that does not work.
+      assert html =~
+               ~s(data-copy="https://a1b2c3.ngrok-free.app/telegram/webhook?token=test_telegram_webhook_token")
+
       assert html =~ ~s(aria-label="Copy the public URL")
     end
   end

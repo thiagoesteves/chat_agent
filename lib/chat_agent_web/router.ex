@@ -21,6 +21,24 @@ defmodule ChatAgentWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # One pipeline per channel webhook, each requiring the token that channel's
+  # URL was published with. This is the guard that needs nothing from the
+  # service on the other end, which is what makes it the one every channel can
+  # have: see `ChatAgent.Channel.Token`.
+  #
+  # A pipeline per channel rather than one that reads the channel out of the
+  # request, for the same reason the routes are per channel: what is checked
+  # should be fixed by the route, never chosen by the caller. It sits beside
+  # `:api` rather than inside it, because `:api` also carries `/health`, which
+  # a load balancer has to be able to reach.
+  pipeline :telegram_webhook do
+    plug ChatAgentWeb.Plugs.WebhookToken, channel: :telegram
+  end
+
+  pipeline :whatsapp_webhook do
+    plug ChatAgentWeb.Plugs.WebhookToken, channel: :whatsapp
+  end
+
   # Public landing page.
   scope "/", ChatAgentWeb do
     pipe_through :browser
@@ -49,15 +67,17 @@ defmodule ChatAgentWeb.Router do
   # One scope per channel, all following the same "/<channel>/webhook" shape.
   # Only the verbs a provider actually uses are exposed: WhatsApp performs a
   # GET subscription handshake, Telegram does not.
+  #
+  # Every verb of every channel is behind the token its URL was published with.
   scope "/whatsapp/webhook", ChatAgentWeb do
-    pipe_through :api
+    pipe_through [:api, :whatsapp_webhook]
 
     get "/", WhatsappController, :verify
     post "/", WhatsappController, :handle_webhook
   end
 
   scope "/telegram/webhook", ChatAgentWeb do
-    pipe_through :api
+    pipe_through [:api, :telegram_webhook]
 
     post "/", TelegramController, :handle_webhook
   end

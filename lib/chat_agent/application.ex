@@ -5,10 +5,16 @@ defmodule ChatAgent.Application do
 
   use Application
 
+  alias ChatAgent.Channel.Token
+
   require Logger
 
   @impl true
   def start(_type, _args) do
+    # Settled before the endpoint can serve a request or the tunnel can
+    # register a URL, so that every one of them is built from the same token.
+    Token.install()
+
     children =
       [
         ChatAgentWeb.Telemetry,

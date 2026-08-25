@@ -61,6 +61,15 @@ config :chat_agent, ChatAgent.Channel.Telegram,
 
 config :chat_agent, ChatAgent.Channel.Whatsapp, allowed_chat_ids: []
 
+# The secret each channel's webhook URL carries, and the one guard that works
+# whatever the service on the other end supports. Unset generates one per node
+# at startup, which is what a development machine behind a tunnel wants; a
+# deployment behind a fixed name sets it, from TELEGRAM_WEBHOOK_TOKEN or
+# WHATSAPP_WEBHOOK_TOKEN, so it survives a restart. See `ChatAgent.Channel.Token`.
+config :chat_agent, ChatAgent.Channel.Token,
+  telegram: nil,
+  whatsapp: nil
+
 # Public ingress. Without a provider no tunnel is run and the URL, if any,
 # comes from the `:url` key: that is how a deployment behind DNS runs, and
 # `TUNNEL_PROVIDER=ngrok` or `TUNNEL_PROVIDER=pinggy` in config/runtime.exs is
@@ -142,6 +151,11 @@ config :tailwind,
     ),
     cd: Path.expand("..", __DIR__)
   ]
+
+# A request log line is built from `conn.request_path`, which stops at the `?`,
+# so a webhook token never reaches it. This covers everywhere else a parameter
+# is written down: an exception report, and the debug page in development.
+config :phoenix, :filter_parameters, ["password", "token", "secret"]
 
 # Configure Elixir's Logger
 config :logger, :default_formatter,
