@@ -91,13 +91,18 @@ defmodule ChatAgent.Channel.Token do
   @doc """
   The token `channel`'s webhook URL carries.
 
+  Named `for_channel` rather than `for`, which is a special form: a function of
+  that name can never be called unqualified, and reads as a comprehension
+  wherever it appears. `ChatAgent.Accounts.Scope.for_user/1` is named the same
+  way.
+
   ## Examples
 
-      iex> ChatAgent.Channel.Token.for(:telegram)
+      iex> ChatAgent.Channel.Token.for_channel(:telegram)
       "test_telegram_webhook_token"
   """
-  @spec for(channel :: Channel.channel()) :: String.t()
-  def for(channel) do
+  @spec for_channel(channel :: Channel.channel()) :: String.t()
+  def for_channel(channel) do
     configured(channel) || :persistent_term.get(key(channel), nil) || generate_and_keep(channel)
   end
 
@@ -122,7 +127,7 @@ defmodule ChatAgent.Channel.Token do
   def valid?(_channel, nil), do: false
 
   def valid?(channel, presented) when is_binary(presented) do
-    Plug.Crypto.secure_compare(__MODULE__.for(channel), presented)
+    Plug.Crypto.secure_compare(for_channel(channel), presented)
   end
 
   ### ==========================================================================

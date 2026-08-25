@@ -193,12 +193,12 @@ defmodule ChatAgent.ChannelTest do
       for channel <- [:telegram, :whatsapp] do
         %URI{query: query} = URI.parse(Channel.webhook_url(channel, "https://example.com"))
 
-        assert URI.decode_query(query) == %{"token" => Token.for(channel)}
+        assert URI.decode_query(query) == %{"token" => Token.for_channel(channel)}
       end
     end
 
     test "gives each channel a token of its own, so one URL does not open another" do
-      refute Token.for(:telegram) == Token.for(:whatsapp)
+      refute Token.for_channel(:telegram) == Token.for_channel(:whatsapp)
     end
   end
 

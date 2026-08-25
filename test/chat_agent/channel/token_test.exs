@@ -20,21 +20,21 @@ defmodule ChatAgent.Channel.TokenTest do
 
   describe "for/1" do
     test "answers the configured token" do
-      assert Token.for(:telegram) == "test_telegram_webhook_token"
+      assert Token.for_channel(:telegram) == "test_telegram_webhook_token"
     end
 
     test "answers the same token every time it is asked", %{configured: configured} do
       Application.put_env(:chat_agent, Token, Keyword.delete(configured, :telegram))
       :persistent_term.erase({Token, :telegram})
 
-      assert Token.for(:telegram) == Token.for(:telegram)
+      assert Token.for_channel(:telegram) == Token.for_channel(:telegram)
     end
 
     test "generates a token for a channel that has none", %{configured: configured} do
       Application.put_env(:chat_agent, Token, Keyword.delete(configured, :telegram))
       :persistent_term.erase({Token, :telegram})
 
-      token = Token.for(:telegram)
+      token = Token.for_channel(:telegram)
 
       refute token == "test_telegram_webhook_token"
       # 32 bytes, url-safe and unpadded, which is 43 characters.
@@ -43,7 +43,7 @@ defmodule ChatAgent.Channel.TokenTest do
     end
 
     test "gives two channels different tokens, so one URL does not open another" do
-      refute Token.for(:telegram) == Token.for(:whatsapp)
+      refute Token.for_channel(:telegram) == Token.for_channel(:whatsapp)
     end
   end
 
@@ -70,7 +70,7 @@ defmodule ChatAgent.Channel.TokenTest do
   describe "install/0" do
     test "leaves a configured token alone" do
       assert Token.install() == :ok
-      assert Token.for(:telegram) == "test_telegram_webhook_token"
+      assert Token.for_channel(:telegram) == "test_telegram_webhook_token"
     end
 
     test "settles a token for a channel that has none", %{configured: configured} do
@@ -82,7 +82,7 @@ defmodule ChatAgent.Channel.TokenTest do
       settled = :persistent_term.get({Token, :telegram})
 
       assert is_binary(settled)
-      assert Token.for(:telegram) == settled
+      assert Token.for_channel(:telegram) == settled
     end
 
     test "warns when it generates one behind a URL nothing will re-register",

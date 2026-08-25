@@ -221,7 +221,7 @@ defmodule ChatAgent.Channel do
   """
   @spec webhook_url(channel :: channel(), base_url :: String.t()) :: String.t()
   def webhook_url(channel, base_url) do
-    query = URI.encode_query(%{"token" => Token.for(channel)})
+    query = URI.encode_query(%{"token" => Token.for_channel(channel)})
 
     "#{String.trim_trailing(base_url, "/")}/#{channel}/webhook?#{query}"
   end
