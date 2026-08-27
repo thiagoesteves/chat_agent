@@ -110,7 +110,7 @@ config :chat_agent, ChatAgent.Assistant,
   # ASSISTANT_WORKING_DIR_ROOT and ASSISTANT_WORKING_DIR.
   working_dir_root: nil,
   working_dir: nil,
-  session_timeout: :timer.minutes(5),
+  session_timeout: :timer.minutes(30),
   history_limit: 20,
   adapters: [
     claude: ChatAgent.Assistant.Claude
@@ -118,7 +118,7 @@ config :chat_agent, ChatAgent.Assistant,
 
 config :chat_agent, ChatAgent.Assistant.Claude,
   executable: "claude",
-  timeout: :timer.minutes(2)
+  timeout: :timer.minutes(30)
 
 # Configure the endpoint
 config :chat_agent, ChatAgentWeb.Endpoint,
