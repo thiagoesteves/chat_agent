@@ -8,7 +8,7 @@ There is no database: inbound messages are handled in process and broadcast over
 Reaching those webhooks from the internet is `ChatAgent.Tunnel`'s job: in a deployment that is a DNS name, and on a development machine it is a tunnel agent (ngrok or Pinggy) run as an OS process.
 
 Elixir requirement is `~> 1.19`.
-The exact toolchain is pinned in `.tool-versions` (Erlang 28.5.0.4, Elixir 1.19.5-otp-28).
+The exact toolchain is pinned in `.tool-versions` (Erlang 29.0.6, Elixir 1.20.4-otp-29).
 
 ---
 

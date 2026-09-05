@@ -492,7 +492,11 @@ defmodule ChatAgent.Tunnel.ServerTest do
       server = connected_server()
 
       stub(ChatAgent.ChannelMock, :webhook_health, fn -> {:ok, failing()} end)
-      stub(CommanderMock, :stop, fn os_pid -> send(test_process, {:stopped, os_pid}) && :ok end)
+
+      stub(CommanderMock, :stop, fn os_pid ->
+        send(test_process, {:stopped, os_pid})
+        :ok
+      end)
 
       # Two forced registrations, and then the URL is the only thing left to
       # suspect.
@@ -542,7 +546,11 @@ defmodule ChatAgent.Tunnel.ServerTest do
       server = connected_server()
 
       stub(ChatAgent.ChannelMock, :webhook_health, fn -> {:ok, failing()} end)
-      stub(CommanderMock, :stop, fn os_pid -> send(test_process, {:stopped, os_pid}) && :ok end)
+
+      stub(CommanderMock, :stop, fn os_pid ->
+        send(test_process, {:stopped, os_pid})
+        :ok
+      end)
 
       # Through the ladder: told again, told again, given another URL, and told
       # again on that one too.

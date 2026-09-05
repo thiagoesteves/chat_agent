@@ -4,8 +4,6 @@ defmodule ChatAgent.ChannelTest do
   import ExUnit.CaptureLog
   import Mox
 
-  require Logger
-
   alias ChatAgent.Channel
   alias ChatAgent.Channel.Message
   alias ChatAgent.Channel.Token
