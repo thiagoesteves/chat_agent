@@ -19,7 +19,7 @@ Each card is one channel, and the badge beside a channel's name is the session a
 
 ## Requirements
 
-The toolchain is pinned in `.tool-versions`, currently Erlang 28.5.0.4 and Elixir 1.19.5-otp-28.
+The toolchain is pinned in `.tool-versions`, currently Erlang 29.0.6 and Elixir 1.20.4-otp-29.
 
 | For | You need |
 |---|---|

@@ -36,8 +36,6 @@ defmodule ChatAgent.Tunnel.Provider.Ngrok do
 
   alias ChatAgent.Commander
 
-  require Logger
-
   # The token ends up inside a shell command, so it is checked against what an
   # authtoken can contain rather than escaped. A token that fails this is a
   # mistyped configuration value, not a token.

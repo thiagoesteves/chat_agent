@@ -4,8 +4,6 @@ defmodule ChatAgent.Assistant.SessionTest do
   import ExUnit.CaptureLog
   import Mox
 
-  require Logger
-
   alias ChatAgent.Assistant
   alias ChatAgent.Assistant.Session
   alias ChatAgent.Channel
