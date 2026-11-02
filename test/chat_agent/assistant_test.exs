@@ -76,36 +76,48 @@ defmodule ChatAgent.AssistantTest do
     end
 
     test "reads the working directory a conversation asked for" do
-      assert {:ok, %{password: "hunter2", work_dir: "my-app-folder"}} =
-               Assistant.authentication("/auth hunter2 --work-dir my-app-folder")
+      assert {:ok, %{password: "hunter2", work_dir: "my-app-folder", action: :open}} =
+               Assistant.authentication("/auth hunter2 my-app-folder")
 
       assert {:ok,
               %{password: "two words", assistant: "claude", work_dir: "nested/my-app-folder"}} =
-               Assistant.authentication(
-                 ~s(/auth-claude "two words" --work-dir nested/my-app-folder)
-               )
+               Assistant.authentication(~s(/auth-claude "two words" nested/my-app-folder))
     end
 
     test "reads the two questions about the public URL, which open no session" do
-      assert {:ok, %{password: "hunter2", action: :url, work_dir: nil}} =
-               Assistant.authentication("/auth hunter2 --url")
+      assert {:ok, %{password: "hunter2", action: :url, assistant: nil, work_dir: nil}} =
+               Assistant.authentication("/url hunter2")
 
-      assert {:ok, %{password: "hunter2", action: :renew, work_dir: nil}} =
-               Assistant.authentication("/auth hunter2 --renew")
+      assert {:ok, %{password: "hunter2", action: :renew, assistant: nil, work_dir: nil}} =
+               Assistant.authentication("/renew hunter2")
 
       assert {:ok, %{password: "two words", action: :url}} =
-               Assistant.authentication(~s(/auth "two words" --url))
+               Assistant.authentication(~s(/url "two words"))
     end
 
-    test "refuses an option it does not know, rather than reading past it" do
+    test "reads what a phone keyboard makes of the quotes" do
+      # Smart punctuation turns straight quotes into curly ones as they are
+      # typed, which is why no form here relies on any other punctuation.
+      assert {:ok, %{password: "two words", work_dir: "my-app-folder"}} =
+               Assistant.authentication("/auth “two words” my-app-folder")
+
+      assert {:ok, %{password: "two words", action: :url}} =
+               Assistant.authentication("/url “two words”")
+    end
+
+    test "refuses a command it does not know, rather than reading past it" do
       # A word this does not understand is not an attempt at all, so it is met
       # with the silence a wrong password gets rather than with a session.
-      assert :error = Assistant.authentication("/auth hunter2 --urls")
-      assert :error = Assistant.authentication("/auth hunter2 --renew-url")
-      assert :error = Assistant.authentication("/auth hunter2 --url --renew")
-      # The options are alternatives: what asks about the URL opens no session,
-      # so there is nothing for a working directory to belong to.
-      assert :error = Assistant.authentication("/auth hunter2 --url --work-dir my-app-folder")
+      assert :error = Assistant.authentication("/urls hunter2")
+      assert :error = Assistant.authentication("/renew-url hunter2")
+      # The URL belongs to this app rather than to an assistant, so there is no
+      # assistant to name.
+      assert :error = Assistant.authentication("/url-claude hunter2")
+      # What asks about the URL opens no session, so there is nothing for a
+      # working directory to belong to.
+      assert :error = Assistant.authentication("/url hunter2 my-app-folder")
+      assert :error = Assistant.authentication("/renew hunter2 my-app-folder")
+      assert :error = Assistant.authentication("/url")
     end
 
     test "ignores what a chat client adds around it" do
@@ -118,8 +130,8 @@ defmodule ChatAgent.AssistantTest do
       assert :error = Assistant.authentication("/auth")
       assert :error = Assistant.authentication("/authorise something")
       assert :error = Assistant.authentication(~s(please /auth "hunter2"))
-      # A password is one word or one quoted string, so a sentence after it is
-      # not an attempt with a long password.
+      # A password is one word or one quoted string, and at most a directory
+      # follows it, so a sentence after it is not an attempt.
       assert :error = Assistant.authentication("/auth hunter2 and then some")
     end
   end
@@ -225,13 +237,29 @@ defmodule ChatAgent.AssistantTest do
     end
 
     test "keeps the question a message asked, since only the password is secret" do
-      for option <- ["--url", "--renew"] do
+      for command <- ["/url", "/renew"] do
         message =
-          Message.new(sender: "123456", conversation: "123456", text: "/auth hunter2 #{option}")
+          Message.new(sender: "123456", conversation: "123456", text: "#{command} hunter2")
 
         assert %Message{text: text} = Assistant.redact(message)
-        assert text == "/auth ***** #{option}"
+        assert text == "#{command} *****"
       end
+    end
+
+    test "keeps the working directory a message named" do
+      message =
+        Message.new(sender: "123456", conversation: "123456", text: "/auth hunter2 my-app-folder")
+
+      assert %Message{text: "/auth ***** my-app-folder"} = Assistant.redact(message)
+    end
+
+    test "replaces one in curly quotes, which is what a phone sends" do
+      # A form that opens a session but is not hidden is a password left on the
+      # dashboard, so whatever a keyboard makes of the quotes is hidden too.
+      message =
+        Message.new(sender: "123456", conversation: "123456", text: "/url “hunter 2”")
+
+      assert %Message{text: ~s(/url "*****")} = Assistant.redact(message)
     end
 
     test "leaves a message carrying no password untouched" do

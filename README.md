@@ -194,20 +194,27 @@ With `ChatAgent.Assistant`'s password set, a conversation can ask for an answer.
 It starts closed, and these are the only words it understands:
 
 ```
-/auth <password>                      open a session on the default assistant
-/auth <password> --work-dir my-repo   say which checkout it works in
-/auth-<name> <password>               name the assistant
-/auth <password> --url                the public URL this app is reachable on
-/auth <password> --renew              open a new public URL, and say so
-/stop                                 close the session
+/auth <password>              open a session on the default assistant
+/auth <password> my-repo      open one that works in that checkout
+/auth-<name> <password>       name the assistant
+/url <password>               the public URL this app is reachable on
+/renew <password>             open a new public URL, and say so
+/stop                         close the session
 ```
 
-A session closes itself after five minutes of silence, and says so.
-`--work-dir` names one directory under `working_dir_root`, and nothing outside it.
+The password always comes right after the command.
+Nothing tells a password apart from a directory name, so `/auth my-repo <password>` is read as the password `my-repo`, and a wrong password gets no answer.
+Quotes are only needed for a password with a space in it, and curly quotes work as well as straight ones.
 
-`--url` and `--renew` open no session and close none: they are the password spent on one answer about the public URL instead of on a conversation.
+None of these use flags such as `--url`.
+Phone keyboards rewrite punctuation as it is typed (iOS turns `--` into an em dash by default), so every form is a command followed by words.
+
+A session closes itself after five minutes of silence, and says so.
+The directory after the password names one directory under `working_dir_root`, and nothing outside it.
+
+`/url` and `/renew` open no session and close none: they are the password spent on one answer about the public URL instead of on a conversation.
 Both are answered whether or not a session is open, which is what makes them useful before there is one, and both cost the password, so nobody who merely found the bot learns where it lives.
-`--renew` runs the tunnel agent again, which is how a free tunnel is asked for another URL; it says so as soon as the tunnel has been told, and the new URL is there to be asked for with `--url` a moment later.
+`/renew` runs the tunnel agent again, which is how a free tunnel is asked for another URL; it says so as soon as the tunnel has been told, and the new URL is there to be asked for with `/url` a moment later.
 It answers that there is nothing to renew where the public URL is a static one, since a deployment behind DNS is reachable at the same place tomorrow.
 
 **What the assistant may do is entirely up to you, and nothing is granted by default.**

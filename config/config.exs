@@ -104,8 +104,8 @@ config :chat_agent, ChatAgent.Commander, adapter: ChatAgent.Commander.Local
 config :chat_agent, ChatAgent.Assistant,
   default: :claude,
   # Where sessions work. The root is the one place a conversation may pick from
-  # with `--work-dir`, so `--work-dir my-app-folder` means that and nothing else,
-  # and the default is a name under it for a conversation that picks nothing.
+  # with `/auth <password> <dir>`, so `/auth <password> my-app-folder` means that
+  # and nothing else, and the default is a name under it for a conversation that picks nothing.
   # Both are per machine: set them in config/<env>.override.exs, or from
   # ASSISTANT_WORKING_DIR_ROOT and ASSISTANT_WORKING_DIR.
   working_dir_root: nil,

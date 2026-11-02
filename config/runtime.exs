@@ -78,7 +78,7 @@ if claude_executable = System.get_env("CLAUDE_EXECUTABLE") do
   config :chat_agent, ChatAgent.Assistant.Claude, executable: claude_executable
 end
 
-# Where sessions work, and the one place --work-dir may pick from.
+# Where sessions work, and the one place `/auth <password> <dir>` may pick from.
 if working_dir = System.get_env("ASSISTANT_WORKING_DIR") do
   config :chat_agent, ChatAgent.Assistant, working_dir: working_dir
 end

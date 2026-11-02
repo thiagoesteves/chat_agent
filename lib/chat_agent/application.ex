@@ -38,7 +38,8 @@ defmodule ChatAgent.Application do
   # `working_dir` belongs to an assistant, and `working_dir_root` to the
   # sessions that may choose one, which puts two similar names in two places.
   # Setting the root on the assistant is silent otherwise: nothing reads it,
-  # and every --work-dir is refused with no reason given.
+  # and every working directory a conversation names is refused with no
+  # reason given.
   defp warn_about_misplaced_root do
     Enum.each(ChatAgent.Assistant.list(), fn {name, module} ->
       if Application.get_env(:chat_agent, module, [])[:working_dir_root] do

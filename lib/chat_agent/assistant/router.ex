@@ -7,10 +7,10 @@ defmodule ChatAgent.Assistant.Router do
   on the conversation belongs to a `ChatAgent.Assistant.Session` process, which
   holds it and answers it; this router only decides who gets one.
 
-  `/auth <password> --url` and `/auth <password> --renew` are the same password
-  spent on one answer about the public URL instead of on a session. They open
-  nothing, they close nothing, and they are answered here rather than in a
-  session, so they read the same whether a conversation has one open or not.
+  `/url <password>` and `/renew <password>` are the same password spent on one
+  answer about the public URL instead of on a session. They open nothing, they
+  close nothing, and they are answered here rather than in a session, so they
+  read the same whether a conversation has one open or not.
 
   That split is what keeps the router quick: asking an assistant takes as long
   as the assistant takes, and it happens in the session's process, so a
@@ -162,7 +162,7 @@ defmodule ChatAgent.Assistant.Router do
   defp renewed_url do
     case Tunnel.renew() do
       :ok ->
-        "Renewing the public URL. Ask for it with --url in a moment."
+        "Renewing the public URL. Ask for it with /url in a moment."
 
       {:error, :not_configured} ->
         "The public URL here is not a tunnel, so there is nothing to renew."
@@ -202,7 +202,7 @@ defmodule ChatAgent.Assistant.Router do
           reason: "no :working_dir_root configured under ChatAgent.Assistant"
         })
 
-        reply(message, "No working directories are offered here, so --work-dir cannot be used.")
+        reply(message, "No working directories are offered here, so none can be named.")
         state
 
       # No attempt, or the wrong password. Both are met with silence.
@@ -255,7 +255,7 @@ defmodule ChatAgent.Assistant.Router do
   end
 
   # A conversation that named nowhere gets the configured default, which is
-  # written as a name under the same root that --work-dir picks from.
+  # written as a name under the same root that a conversation picks from.
   defp working_dir(nil), do: {:ok, Assistant.default_working_dir()}
 
   defp working_dir(named) do
