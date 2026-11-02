@@ -18,9 +18,20 @@ defmodule ChatAgent.Channel do
 
       config :chat_agent, ChatAgent.Channel,
         adapters: [
-          whatsapp: ChatAgent.Channel.Whatsapp,
-          telegram: ChatAgent.Channel.Telegram
-        ]
+          telegram: ChatAgent.Channel.Telegram,
+          whatsapp: ChatAgent.Channel.Whatsapp
+        ],
+        enabled: [:telegram]
+
+  `adapters` is every channel this app can speak, and `enabled` is the ones
+  this node runs. A channel that is not enabled is treated as unknown
+  everywhere: it gets no webhook token or registration, no card on the
+  dashboard, and `handle_message/2` and `send_message/4` refuse it. Without
+  `enabled`, every adapter is.
+
+  It is a separate list rather than a shorter `adapters`, because configuration
+  merges keyword lists key by key: `config/runtime.exs` or an override file can
+  add an adapter to the default list, but never take one out of it.
 
   ## Subscribing to inbound messages
 
@@ -227,18 +238,23 @@ defmodule ChatAgent.Channel do
   end
 
   @doc """
-  List every configured channel and the module that speaks it.
+  List every enabled channel and the module that speaks it, in the order the
+  adapters are configured.
 
   ## Examples
 
       iex> ChatAgent.Channel.list()
-      [whatsapp: ChatAgent.Channel.Whatsapp, telegram: ChatAgent.Channel.Telegram]
+      [telegram: ChatAgent.Channel.Telegram, whatsapp: ChatAgent.Channel.Whatsapp]
   """
   @spec list() :: [{channel(), module()}]
   def list do
-    :chat_agent
-    |> Application.get_env(__MODULE__, [])
-    |> Keyword.get(:adapters, [])
+    configured = Application.get_env(:chat_agent, __MODULE__, [])
+    adapters = Keyword.get(configured, :adapters, [])
+
+    case Keyword.fetch(configured, :enabled) do
+      {:ok, enabled} -> Keyword.take(adapters, enabled)
+      :error -> adapters
+    end
   end
 
   @doc """

@@ -14,6 +14,7 @@ defmodule ChatAgent.Application do
     # Settled before the endpoint can serve a request or the tunnel can
     # register a URL, so that every one of them is built from the same token.
     Token.install()
+    warn_about_unknown_channels()
 
     children =
       [
@@ -33,6 +34,23 @@ defmodule ChatAgent.Application do
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: ChatAgent.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  # A channel named in `enabled` that no adapter speaks is left out of
+  # `ChatAgent.Channel.list/0` without a word, which on a misspelt override
+  # looks like a channel that is down for no reason.
+  defp warn_about_unknown_channels do
+    configured = Application.get_env(:chat_agent, ChatAgent.Channel, [])
+    adapters = Keyword.get(configured, :adapters, [])
+
+    for channel <- Keyword.get(configured, :enabled, []),
+        not Keyword.has_key?(adapters, channel) do
+      Logger.warning(%{
+        what: "channel_enabled_unknown",
+        channel: channel,
+        reason: "no adapter is configured for it under ChatAgent.Channel, so it is not run"
+      })
+    end
   end
 
   # `working_dir` belongs to an assistant, and `working_dir_root` to the

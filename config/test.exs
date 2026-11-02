@@ -34,6 +34,9 @@ config :chat_agent, ChatAgent.Assistant,
   history_limit: 4,
   adapters: [claude: ChatAgent.AssistantMock]
 
+# Both channels, since the suite exercises both.
+config :chat_agent, ChatAgent.Channel, enabled: [:telegram, :whatsapp]
+
 config :chat_agent, ChatAgent.Channel.Whatsapp,
   verify_token: "test_verify_token",
   access_token: "test_access_token",

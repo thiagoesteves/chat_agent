@@ -101,6 +101,24 @@ mix phx.server
 Sign in at [`/users/log-in`](http://localhost:4000/users/log-in) with the email and password you seeded.
 The dashboard is at [`/channels`](http://localhost:4000/channels).
 
+### Channels
+
+Only Telegram is enabled by default, since it needs nothing but a bot token.
+WhatsApp needs a Meta app set up by hand, so it is opted into, in `config/dev.override.exs`:
+
+```elixir
+config :chat_agent, ChatAgent.Channel, enabled: [:telegram, :whatsapp]
+```
+
+Or from the environment, which takes precedence over the file:
+
+```bash
+CHANNELS=telegram,whatsapp mix phx.server
+```
+
+A channel that is not enabled gets no webhook token, no registered webhook and no card on the dashboard, and its webhook route answers 403 to every request.
+An unknown name in `CHANNELS` stops the boot, and one in a config file is logged at boot as `channel_enabled_unknown`.
+
 **There is no registration page.** An account is created by the seed file above, or by hand in `iex`, because signing in here grants a dashboard that reads every conversation and an assistant that runs a command line tool: an account is a grant, not a signup.
 
 ## A public URL
@@ -264,6 +282,7 @@ PHX_HOST=chat.example.com          # the public URL, instead of a tunnel
 SECRET_KEY_BASE=…                  # mix phx.gen.secret
 DATABASE_PATH=/data/chat_agent.db  # a mounted volume
 ASSISTANT_SALTED_PASSWORD=…        # a hash, not a password; without one nothing is answered
+CHANNELS=telegram                  # which channels run; telegram,whatsapp for both
 TELEGRAM_WEBHOOK_TOKEN=…           # guards the webhook URL; generated per boot if unset,
 WHATSAPP_WEBHOOK_TOKEN=…           # which behind a fixed name means deliveries stop
 ```

@@ -304,11 +304,46 @@ defmodule ChatAgent.ChannelTest do
   end
 
   describe "list/0" do
-    test "returns every configured channel and its module" do
+    test "returns every enabled channel and its module" do
       assert Channel.list() == [
                telegram: ChatAgent.Channel.Telegram,
                whatsapp: ChatAgent.Channel.Whatsapp
              ]
+    end
+
+    test "leaves out a channel that is not enabled, keeping the adapters' order" do
+      configure(enabled: [:whatsapp])
+
+      assert Channel.list() == [whatsapp: ChatAgent.Channel.Whatsapp]
+
+      configure(enabled: [:whatsapp, :telegram])
+
+      assert Channel.list() == [
+               telegram: ChatAgent.Channel.Telegram,
+               whatsapp: ChatAgent.Channel.Whatsapp
+             ]
+    end
+
+    test "enables every adapter when nothing says which" do
+      configure([])
+
+      assert Keyword.keys(Channel.list()) == [:telegram, :whatsapp]
+    end
+
+    test "ignores an enabled name that no adapter speaks" do
+      configure(enabled: [:telegram, :carrier_pigeon])
+
+      assert Channel.list() == [telegram: ChatAgent.Channel.Telegram]
+    end
+
+    test "treats a channel that is not enabled as unknown, in both directions" do
+      configure(enabled: [:telegram])
+
+      assert {:error, {:unknown_channel, :whatsapp}} =
+               Channel.handle_message(:whatsapp, %{"from" => "15551234567"})
+
+      assert {:error, {:unknown_channel, :whatsapp}} =
+               Channel.send_message(:whatsapp, "15551234567", "hello")
     end
   end
 
@@ -368,6 +403,19 @@ defmodule ChatAgent.ChannelTest do
       assert Channel.topic(:whatsapp) == "channel:whatsapp"
       assert Channel.topic(:telegram) == "channel:telegram"
     end
+  end
+
+  # The configured adapters, with `enabled` replaced: `[]` drops the key.
+  defp configure(enabled) do
+    configured = Application.get_env(:chat_agent, Channel)
+
+    on_exit(fn -> Application.put_env(:chat_agent, Channel, configured) end)
+
+    Application.put_env(
+      :chat_agent,
+      Channel,
+      Keyword.merge(Keyword.delete(configured, :enabled), enabled)
+    )
   end
 
   defp stub_channel do

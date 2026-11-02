@@ -65,6 +65,21 @@ defmodule ChatAgent.Channel.TokenTest do
     test "refuses a token that is only a prefix of the right one" do
       refute Token.valid?(:telegram, "test_telegram_webhook_toke")
     end
+
+    test "refuses every token for a channel that is not enabled, even its own" do
+      channel = Application.get_env(:chat_agent, ChatAgent.Channel)
+
+      on_exit(fn -> Application.put_env(:chat_agent, ChatAgent.Channel, channel) end)
+
+      Application.put_env(
+        :chat_agent,
+        ChatAgent.Channel,
+        Keyword.put(channel, :enabled, [:telegram])
+      )
+
+      refute Token.valid?(:whatsapp, "test_whatsapp_webhook_token")
+      assert Token.valid?(:telegram, "test_telegram_webhook_token")
+    end
   end
 
   describe "install/0" do

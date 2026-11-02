@@ -34,11 +34,19 @@ config :swoosh, :api_client, Swoosh.ApiClient.Finch
 
 # Maps each chat channel to the module that speaks it, in both directions.
 # Every module implements `ChatAgent.Channel.Adapter`.
+#
+# `enabled` is which of them this node runs: only those get a webhook token, a
+# registered webhook, a card on the dashboard, and messages in or out. Telegram
+# is the default because it is the one that works from a bot token alone;
+# WhatsApp needs a Meta app set up by hand, so it is opted into. Set it per
+# machine in config/<env>.override.exs, or from CHANNELS=telegram,whatsapp.
+# Without the key, every adapter is enabled.
 config :chat_agent, ChatAgent.Channel,
   adapters: [
     telegram: ChatAgent.Channel.Telegram,
     whatsapp: ChatAgent.Channel.Whatsapp
-  ]
+  ],
+  enabled: [:telegram]
 
 # Each channel reads its own configuration under its module name, the same way
 # a tunnel provider does. Only defaults live here: everything secret is read

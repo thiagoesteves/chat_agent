@@ -3,6 +3,25 @@ import Config
 config :chat_agent,
   healthcheck_logging: System.get_env("HEALTHCHECK_LOGGING") == "true"
 
+# Which channels this node runs, comma separated: CHANNELS=telegram,whatsapp.
+# Unset keeps what configuration says, which by default is Telegram only. A
+# name nobody knows stops the boot, since quietly skipping it would leave a
+# channel down with nothing saying why.
+if channels = System.get_env("CHANNELS") do
+  enabled =
+    channels
+    |> String.split(",", trim: true)
+    |> Enum.map(fn name ->
+      case String.trim(name) do
+        "telegram" -> :telegram
+        "whatsapp" -> :whatsapp
+        other -> raise "CHANNELS names #{inspect(other)}, expected telegram or whatsapp"
+      end
+    end)
+
+  config :chat_agent, ChatAgent.Channel, enabled: enabled
+end
+
 # Each channel's credentials, under that channel's own module. As everywhere
 # else in this file, a key is set only when its variable is there, so nothing
 # here overwrites config/<env>.override.exs with a nil.

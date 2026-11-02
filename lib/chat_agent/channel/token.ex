@@ -112,6 +112,10 @@ defmodule ChatAgent.Channel.Token do
   Compared in constant time, since a comparison that stops at the first wrong
   byte tells whoever is guessing how much of the guess was right.
 
+  A channel that is not enabled accepts no token at all, configured or not, so
+  its webhook route refuses every request before its controller runs: a
+  disabled WhatsApp answers neither Meta's handshake nor a delivery.
+
   ## Examples
 
       iex> ChatAgent.Channel.Token.valid?(:telegram, "test_telegram_webhook_token")
@@ -127,7 +131,8 @@ defmodule ChatAgent.Channel.Token do
   def valid?(_channel, nil), do: false
 
   def valid?(channel, presented) when is_binary(presented) do
-    Plug.Crypto.secure_compare(for_channel(channel), presented)
+    Keyword.has_key?(Channel.list(), channel) and
+      Plug.Crypto.secure_compare(for_channel(channel), presented)
   end
 
   ### ==========================================================================
