@@ -100,6 +100,37 @@ defmodule ChatAgentWeb.WhatsappControllerTest do
     end
   end
 
+  describe "when WhatsApp is not enabled" do
+    setup do
+      configured = Application.get_env(:chat_agent, Channel)
+
+      on_exit(fn -> Application.put_env(:chat_agent, Channel, configured) end)
+
+      Application.put_env(:chat_agent, Channel, Keyword.put(configured, :enabled, [:telegram]))
+    end
+
+    # The token is still configured, as it would be on a machine that turned
+    # the channel off without unsetting WHATSAPP_WEBHOOK_TOKEN.
+    test "refuses the subscription handshake", %{conn: conn} do
+      conn =
+        get(conn, ~p"/whatsapp/webhook", %{
+          "token" => @token,
+          "hub.mode" => "subscribe",
+          "hub.verify_token" => "test_verify_token",
+          "hub.challenge" => "challenge_123"
+        })
+
+      assert conn.status == 403
+    end
+
+    test "refuses a delivery before it reaches the channel", %{conn: conn} do
+      # No expectation on the mock: Mox raises if a message reaches it anyway.
+      conn = post_webhook(conn, %{"object" => "whatsapp_business_account"})
+
+      assert conn.status == 403
+    end
+  end
+
   defp post_webhook(conn, payload) do
     conn
     |> put_req_header("content-type", "application/json")

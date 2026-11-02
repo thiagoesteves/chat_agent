@@ -616,10 +616,20 @@ An unknown channel returns `{:error, {:unknown_channel, channel}}` rather than r
 ```elixir
 config :chat_agent, ChatAgent.Channel,
   adapters: [
-    whatsapp: ChatAgent.Channel.Whatsapp,
-    telegram: ChatAgent.Channel.Telegram
-  ]
+    telegram: ChatAgent.Channel.Telegram,
+    whatsapp: ChatAgent.Channel.Whatsapp
+  ],
+  enabled: [:telegram]
 ```
+
+`adapters` is every channel the app can speak, and `enabled` is the ones a node runs.
+The default is Telegram only, since WhatsApp needs a Meta app set up by hand; it is turned on in an override file, or with `CHANNELS=telegram,whatsapp`, which `config/runtime.exs` reads and which stops the boot on a name it does not know.
+`ChatAgent.Channel.list/0` returns only enabled channels, and everything else reads that: token installation, webhook registration and health, the router's subscriptions, the dashboard, and `handle_message/2` and `send_message/4`, which answer `{:error, {:unknown_channel, channel}}` for a disabled one.
+`ChatAgent.Channel.Token.valid?/2` refuses every token for a disabled channel, so its webhook route answers 403 before its controller runs.
+Without the `enabled` key every adapter is enabled, which is what a test that replaces the whole `ChatAgent.Channel` config gets.
+
+It is a separate list rather than a shorter `adapters` on purpose: `Config` merges keyword lists key by key, so a runtime or override file can add an adapter to the default list but never remove one, while a plain list such as `enabled` is replaced outright.
+A new channel is added to `adapters` and, if it should run by default, to `enabled`.
 
 ```elixir
 scope "/my_channel/webhook", ChatAgentWeb do
