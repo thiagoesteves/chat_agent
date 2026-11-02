@@ -201,7 +201,7 @@ defmodule ChatAgent.Assistant.RouterTest do
       expect_reply("in my-app-folder")
       router = start_router()
 
-      say("/auth #{@password} --work-dir my-app-folder")
+      say("/auth #{@password} my-app-folder")
 
       assert_receive {:replied, body}
       # Named in the greeting, so the conversation knows where it is working.
@@ -248,7 +248,7 @@ defmodule ChatAgent.Assistant.RouterTest do
       expect_reply("No working directory called ../.. here")
       router = start_router()
 
-      say("/auth #{@password} --work-dir ../..")
+      say("/auth #{@password} ../..")
 
       assert_receive {:replied, _body}
       # No session at all: it asked for somewhere it may not go.
@@ -267,7 +267,7 @@ defmodule ChatAgent.Assistant.RouterTest do
 
       log =
         capture_log(fn ->
-          say("/auth #{@password} --work-dir my-app-folder")
+          say("/auth #{@password} my-app-folder")
           assert_receive {:replied, _body}
         end)
 
@@ -400,7 +400,7 @@ defmodule ChatAgent.Assistant.RouterTest do
       expect_reply("https://example.test")
       router = start_router()
 
-      say("/auth #{@password} --url")
+      say("/url #{@password}")
 
       assert_receive {:replied, "https://example.test"}
       assert Router.sessions(router) == %{}
@@ -416,7 +416,7 @@ defmodule ChatAgent.Assistant.RouterTest do
       assert_receive {:replied, _body}
 
       expect_reply("https://example.test")
-      say("/auth #{@password} --url")
+      say("/url #{@password}")
 
       assert_receive {:replied, "https://example.test"}
       # The session it was said in is untouched.
@@ -429,7 +429,7 @@ defmodule ChatAgent.Assistant.RouterTest do
       tunnel(url: "https://example.test")
       router = start_router()
 
-      say("/auth not-the-password --url")
+      say("/url not-the-password")
 
       _ = :sys.get_state(router)
       assert Router.sessions(router) == %{}
@@ -440,7 +440,7 @@ defmodule ChatAgent.Assistant.RouterTest do
       expect_reply("still connecting")
       start_router()
 
-      say("/auth #{@password} --url")
+      say("/url #{@password}")
 
       assert_receive {:replied, _body}
     end
@@ -450,7 +450,7 @@ defmodule ChatAgent.Assistant.RouterTest do
       expect_reply("No public URL is configured")
       start_router()
 
-      say("/auth #{@password} --url")
+      say("/url #{@password}")
 
       assert_receive {:replied, _body}
     end
@@ -464,12 +464,12 @@ defmodule ChatAgent.Assistant.RouterTest do
       assert_receive {:replied, _body}
 
       expect(ChatAgent.AssistantMock, :send_message, fn _conversation, prompt, _options ->
-        assert prompt == "User: /url please"
+        assert prompt == "User: /url"
         {:ok, "an answer"}
       end)
 
       expect_reply("an answer")
-      say("/url please")
+      say("/url")
 
       assert_receive {:replied, _body}
       assert map_size(Router.sessions(router)) == 1
@@ -512,7 +512,7 @@ defmodule ChatAgent.Assistant.RouterTest do
       expect_reply("Renewing the public URL")
       router = start_router()
 
-      say("/auth #{@password} --renew")
+      say("/renew #{@password}")
 
       assert_receive :renew_asked
       assert_receive {:replied, _body}
@@ -524,7 +524,7 @@ defmodule ChatAgent.Assistant.RouterTest do
       expect_reply("No tunnel is running here")
       start_router()
 
-      say("/auth #{@password} --renew")
+      say("/renew #{@password}")
 
       assert_receive {:replied, _body}
     end
@@ -534,7 +534,7 @@ defmodule ChatAgent.Assistant.RouterTest do
       expect_reply("nothing to renew")
       start_router()
 
-      say("/auth #{@password} --renew")
+      say("/renew #{@password}")
 
       assert_receive {:replied, _body}
     end
@@ -544,7 +544,7 @@ defmodule ChatAgent.Assistant.RouterTest do
       tunnel_server(:ok)
       router = start_router()
 
-      say("/auth not-the-password --renew")
+      say("/renew not-the-password")
 
       _ = :sys.get_state(router)
       refute_received :renew_asked
@@ -562,7 +562,7 @@ defmodule ChatAgent.Assistant.RouterTest do
       sessions = Router.sessions(router)
 
       expect_reply("nothing to renew")
-      say("/auth #{@password} --renew")
+      say("/renew #{@password}")
 
       assert_receive {:replied, _body}
       assert Router.sessions(router) == sessions

@@ -24,7 +24,7 @@ defmodule ChatAgent.Assistant do
         # Without one, nobody is let in.
         salted_password: nil,
         # Where sessions work. The root is the one place a conversation may
-        # pick from with --work-dir, and the default is what a conversation
+        # pick from by naming a directory after the password, and the default is what a conversation
         # that picks nothing gets: a name under the root, so the two are
         # written the same way and neither repeats the other.
         working_dir_root: "/srv/checkouts",
@@ -53,20 +53,25 @@ defmodule ChatAgent.Assistant do
   @type action :: :open | :url | :renew
 
   # `/auth <password>`, with `/auth-claude <password>` naming the assistant and
-  # one option after the password: `--work-dir <name>` naming what a session
-  # works in, `--url` asking where this app is reachable, or `--renew` asking
-  # for a new public URL. Quotes are optional and only needed for a password
-  # with a space in it, since a password typed without them is the obvious
-  # thing to type.
+  # a directory after the password naming what a session works in, and
+  # `/url <password>` and `/renew <password>` asking where this app is reachable
+  # and for a new public URL. Quotes are optional and only needed for a
+  # password with a space in it, since a password typed without them is the
+  # obvious thing to type.
   #
-  # The options are alternatives rather than a list, because they are: the two
-  # that ask about the URL open no session, so there is nothing for a working
-  # directory to belong to.
+  # Every form is a command and words, with no flags, because phone keyboards
+  # rewrite punctuation as it is typed: `--` arrives as an em dash and `"` as a
+  # curly quote. Curly quotes are read as quotes for the same reason.
+  #
+  # The password always comes first after the command. Nothing tells a password
+  # apart from a directory name, so position is what does. `/url` and `/renew`
+  # take nothing after it (the conditional on `action`), since they open no
+  # session and there is nothing for a working directory to belong to.
   #
   # Kept here rather than in the router, so that what opens a session and what
   # is hidden from the dashboard cannot drift apart: a form one of them knows
   # and the other does not is a password on a screen.
-  @auth_regex ~r/^\/auth(?:-(?<assistant>[\w-]+))?\s+(?:"(?<quoted>[^"]*)"|(?<bare>\S+))(?:\s+(?:--work-dir\s+(?<work_dir>\S+)|--(?<action>url|renew)))?\s*$/
+  @auth_regex ~r/^\/(?:auth(?:-(?<assistant>[\w-]+))?|(?<action>url|renew))\s+(?:["“”](?<quoted>[^"“”]*)["“”]|(?<bare>\S+))(?(<action>)|(?:\s+(?<work_dir>\S+))?)\s*$/u
 
   # Closing a session by hand, which does what the idle timeout does, just now.
   @stop_command "/stop"
@@ -109,8 +114,8 @@ defmodule ChatAgent.Assistant do
   directory it named, with `nil` for each it left out, and what it is asking
   for.
 
-  `:action` is `:open` for the attempt that opens a session, and `:url` or
-  `:renew` for the two that ask about the public URL instead. Those two open
+  `:action` is `:open` for `/auth`, which opens a session, and `:url` or
+  `:renew` for `/url` and `/renew`, which ask about the public URL instead. Those two open
   nothing: they are the password being spent on one answer.
   """
   @spec authentication(text :: String.t()) ::
@@ -227,14 +232,14 @@ defmodule ChatAgent.Assistant do
       iex> ChatAgent.Assistant.redact_text("/auth-claude hunter2")
       "/auth-claude *****"
 
-      iex> ChatAgent.Assistant.redact_text("/auth hunter2 --work-dir my-app-folder")
-      "/auth ***** --work-dir my-app-folder"
+      iex> ChatAgent.Assistant.redact_text("/auth hunter2 my-app-folder")
+      "/auth ***** my-app-folder"
 
-      iex> ChatAgent.Assistant.redact_text("/auth hunter2 --url")
-      "/auth ***** --url"
+      iex> ChatAgent.Assistant.redact_text("/url hunter2")
+      "/url *****"
 
-      iex> ChatAgent.Assistant.redact_text("/auth hunter2 --renew")
-      "/auth ***** --renew"
+      iex> ChatAgent.Assistant.redact_text("/renew hunter2")
+      "/renew *****"
 
       iex> ChatAgent.Assistant.redact_text("nothing to hide")
       "nothing to hide"
@@ -243,14 +248,13 @@ defmodule ChatAgent.Assistant do
   def redact_text(text) do
     Regex.replace(@auth_regex, String.trim(text), fn _matched,
                                                      assistant,
+                                                     action,
                                                      quoted,
                                                      bare,
-                                                     work_dir,
-                                                     action ->
-      assistant = if assistant == "", do: "", else: "-#{assistant}"
+                                                     work_dir ->
       hidden = if bare == "" and quoted != nil, do: ~s("*****"), else: "*****"
 
-      "/auth#{assistant} #{hidden}#{option(work_dir, action)}"
+      "#{command(assistant, action)} #{hidden}#{directory(work_dir)}"
     end)
   end
 
@@ -372,17 +376,19 @@ defmodule ChatAgent.Assistant do
 
   defp adapter(assistant), do: Keyword.get(list(), assistant)
 
-  # An attempt that named no option is the one that opens a session, which is
-  # what `/auth` was for before there was anything else to ask for.
+  # `/auth`, which names no action, is the one that opens a session.
   defp action("url"), do: :url
   defp action("renew"), do: :renew
   defp action(_none), do: :open
 
-  # Written back exactly as it was typed, since a redacted message is what is
-  # read off the dashboard and out of the logs.
-  defp option(work_dir, _action) when work_dir not in [nil, ""], do: " --work-dir #{work_dir}"
-  defp option(_work_dir, action) when action not in [nil, ""], do: " --#{action}"
-  defp option(_work_dir, _action), do: ""
+  # Written back as it was typed, since a redacted message is what is read off
+  # the dashboard and out of the logs.
+  defp command("", ""), do: "/auth"
+  defp command(assistant, ""), do: "/auth-#{assistant}"
+  defp command(_assistant, action), do: "/#{action}"
+
+  defp directory(""), do: ""
+  defp directory(work_dir), do: " #{work_dir}"
 
   # A group that did not take part comes back empty rather than absent.
   defp blank_to_nil(""), do: nil

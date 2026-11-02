@@ -227,27 +227,34 @@ The URL travels with the question, so an answer about a tunnel that has since be
 A conversation starts closed:
 
 ```
-/auth <password>                        open a session on the default assistant
-/auth-<name> <password>                 name the assistant instead
-/auth <password> --work-dir my-app-folder    say where it works
-/auth <password> --url                  the public URL this app is reachable on
-/auth <password> --renew                open a new public URL
-/stop                                   close the session
+/auth <password>                   open a session on the default assistant
+/auth-<name> <password>            name the assistant instead
+/auth <password> my-app-folder     say where it works
+/url <password>                    the public URL this app is reachable on
+/renew <password>                  open a new public URL
+/stop                              close the session
 ```
 
 Quotes are only needed for a password with a space in it.
-The options after the password are alternatives rather than a list, because they are: `--url` and `--renew` open no session, so there is nothing for a working directory to belong to.
+The password always comes right after the command, since nothing else tells it apart from a directory name.
+`/url` and `/renew` take nothing after the password and name no assistant: they open no session, so there is nothing for a working directory or an assistant to belong to.
 
-`--url` and `--renew` are answered by the router itself rather than by a session, before it has even looked for one, so they read the same whether a conversation has one open or not and the session they were asked from is left untouched.
+**No form uses flags or relies on punctuation other than the leading `/`.**
+Phone keyboards rewrite punctuation as it is typed: iOS Smart Punctuation turns `--` into an em dash and straight quotes into curly ones.
+A flag such as `--url` therefore did not parse from a phone, and because redaction reads the same grammar, the password in it was not redacted either.
+Curly quotes are accepted around a password for the same reason.
+Keep any new command to a word after the `/` and plain words after it.
+
+`/url` and `/renew` are answered by the router itself rather than by a session, before it has even looked for one, so they read the same whether a conversation has one open or not and the session they were asked from is left untouched.
 Both are checked against the password like everything else here, and a wrong one is met with the same silence: the URL is where this machine lives, so it is not a thing to hand to whoever found the bot.
-`--url` answers `ChatAgent.Tunnel.url/0`: the static URL where one is configured, the running tunnel's otherwise, and a sentence saying which of the two is missing when neither is there.
-`--renew` is `ChatAgent.Tunnel.renew/0`, which stops the agent and runs the state machine's whole sequence again, since a free tunnel's URL is whatever the service handed out and asking again is the only way to be handed another.
+`/url` answers `ChatAgent.Tunnel.url/0`: the static URL where one is configured, the running tunnel's otherwise, and a sentence saying which of the two is missing when neither is there.
+`/renew` is `ChatAgent.Tunnel.renew/0`, which stops the agent and runs the state machine's whole sequence again, since a free tunnel's URL is whatever the service handed out and asking again is the only way to be handed another.
 It answers as soon as the tunnel has been told to start over rather than when it has: opening one takes as long as the service takes, and waiting for it here would be the router waiting.
 There is nothing to renew where the URL is a static one, and that is what it says.
 
 The grammar itself lives in `ChatAgent.Assistant`, as one regular expression that both `authentication/1` and `redact_text/1` read: a form that opens something but is not redacted is a password on the dashboard.
 
-`--work-dir` names one directory **under `working_dir_root`**, which is the prefix a conversation types the tail of: with the root set to a workspace, `--work-dir my-app-folder` means that repository and nothing else.
+The directory after the password names one directory **under `working_dir_root`**, which is the prefix a conversation types the tail of: with the root set to a workspace, `/auth <password> my-app-folder` means that repository and nothing else.
 Whoever knows the password picks this, so what is typed is resolved against the root and checked to have landed inside it: a name, a path climbing out with `..`, and an absolute path elsewhere are the same question, answered by where it ends up.
 Without a root configured, no conversation chooses and the assistant works wherever it was configured to.
 Set the root in `config/<env>.override.exs` per machine, or from `ASSISTANT_WORKING_DIR_ROOT`.
@@ -261,7 +268,7 @@ config :chat_agent, ChatAgent.Assistant,
 ```
 
 One root governs both, so neither repeats the other and there is one place to change when the checkouts move.
-An absolute `working_dir` is accepted only where no root is configured, which is the case of an assistant that works in exactly one place; a conversation never reaches that path, since `--work-dir` refuses without a root.
+An absolute `working_dir` is accepted only where no root is configured, which is the case of an assistant that works in exactly one place; a conversation never reaches that path, since naming a directory is refused without a root.
 A default that does not resolve is logged as `assistant_working_dir_unusable` rather than silently ignored, and a root set on an assistant module instead is named at boot.
 
 An open conversation is a `ChatAgent.Assistant.Session` process, started under a `DynamicSupervisor`, and everything about that conversation lives in it: the assistant it is talking to, the turns so far, and the idle timer.
@@ -278,7 +285,7 @@ The router is what holds the protections, and each one exists for a reason worth
 | A guess is checked with `Pbkdf2.verify_pass/2`, and `Pbkdf2.no_user_verify/0` runs when nothing is configured | A comparison that stops at the first wrong byte reports how much of a guess was right, and answering faster when there is no password to check says that too |
 | A session closes after `session_timeout`, five minutes by default, and says so | A conversation somebody walked away from should not stay answerable, and one that ends in silence is indistinguishable from an assistant that broke |
 | `/stop` closes one straight away | Waiting five minutes to end a conversation you have finished is not an answer |
-| `--url` and `--renew` cost the password, open no session, and touch none | The URL is what somebody needs before a session is possible, so it cannot require one, and it is also where this machine lives, so it cannot be free |
+| `/url` and `/renew` cost the password, open no session, and touch none | The URL is what somebody needs before a session is possible, so it cannot require one, and it is also where this machine lives, so it cannot be free |
 | Only the last `history_limit` turns go into a prompt | A long conversation would otherwise grow a prompt without limit |
 | Each conversation is its own process | One slow answer would otherwise stop every other conversation from being answered |
 | Everything shown, stored or logged goes through `ChatAgent.Assistant.redact/1` | A password typed into a chat would otherwise be readable off the dashboard, out of the logs, and out of every prompt after it |
